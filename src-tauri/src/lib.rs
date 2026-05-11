@@ -46,7 +46,10 @@ fn setup_tray(app: &mut tauri::App) -> tauri::Result<()> {
     let quit = MenuItem::with_id(app, "quit", "Quit Claudeometer", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&show, &quit])?;
 
+    let icon = app.default_window_icon().cloned().unwrap();
+
     TrayIconBuilder::new()
+        .icon(icon)
         .menu(&menu)
         .tooltip("Claudeometer")
         .on_menu_event(|app, event| match event.id.as_ref() {
@@ -55,7 +58,13 @@ fn setup_tray(app: &mut tauri::App) -> tauri::Result<()> {
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::Click { .. } = event {
+            // Only fire on left-button-up to avoid double-toggle on click+release
+            if let TrayIconEvent::Click {
+                button: tauri::tray::MouseButton::Left,
+                button_state: tauri::tray::MouseButtonState::Up,
+                ..
+            } = event
+            {
                 toggle_window(tray.app_handle());
             }
         })

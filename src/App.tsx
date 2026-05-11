@@ -63,7 +63,7 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen bg-[#111111] flex flex-col">
+    <div className="h-screen bg-[#111111] flex flex-col border border-zinc-800/80 overflow-hidden">
       {view === "login" && <Login onLogin={handleLogin} />}
       {view === "dashboard" && (
         <Dashboard

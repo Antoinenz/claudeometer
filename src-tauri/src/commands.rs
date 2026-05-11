@@ -8,6 +8,7 @@ use tauri_plugin_store::StoreExt;
 pub struct AuthState {
     pub mode: String, // "none" | "session_key" | "api_key"
     pub email: Option<String>,
+    pub name: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -20,6 +21,7 @@ pub struct Settings {
     pub ntfy_enabled: bool,
     pub ntfy_server: String,
     pub ntfy_topic: String,
+    pub precise_timestamp: bool,
 }
 
 impl Default for Settings {
@@ -33,6 +35,7 @@ impl Default for Settings {
             ntfy_enabled: false,
             ntfy_server: "https://ntfy.sh".to_string(),
             ntfy_topic: "claudeometer".to_string(),
+            precise_timestamp: false,
         }
     }
 }
@@ -47,23 +50,31 @@ pub async fn get_auth_state(app: AppHandle) -> AuthState {
     let email = store
         .get("email")
         .and_then(|v| v.as_str().map(str::to_string));
-    AuthState { mode, email }
+    let name = store
+        .get("name")
+        .and_then(|v| v.as_str().map(str::to_string));
+    AuthState { mode, email, name }
 }
 
 #[tauri::command]
 pub async fn save_session_key(app: AppHandle, key: String) -> Result<AuthState, String> {
     let usage = fetch_claude_usage(&key).await?;
     let email = usage.email.clone();
+    let name = usage.name.clone();
     let store = app.store("store.json").unwrap();
     store.set("auth_mode", "session_key");
     store.set("session_key", key.clone());
     if let Some(ref e) = email {
         store.set("email", e.clone());
     }
+    if let Some(ref n) = name {
+        store.set("name", n.clone());
+    }
     store.save().map_err(|e| e.to_string())?;
     Ok(AuthState {
         mode: "session_key".to_string(),
         email,
+        name,
     })
 }
 
@@ -77,6 +88,7 @@ pub async fn save_api_key(app: AppHandle, key: String) -> Result<AuthState, Stri
     Ok(AuthState {
         mode: "api_key".to_string(),
         email: None,
+        name: None,
     })
 }
 
@@ -87,6 +99,7 @@ pub async fn logout(app: AppHandle) -> Result<(), String> {
     store.delete("session_key");
     store.delete("api_key");
     store.delete("email");
+    store.delete("name");
     store.save().map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -129,19 +142,16 @@ pub async fn get_settings(app: AppHandle) -> Settings {
 }
 
 #[tauri::command]
-pub async fn save_settings(
-    app: AppHandle,
-    settings: Settings,
-) -> Result<(), String> {
-    // Apply autostart
+pub async fn save_settings(app: AppHandle, settings: Settings) -> Result<(), String> {
+    // Apply autostart (ignore errors — plugin may not be registered yet on first run)
     #[cfg(desktop)]
     {
         use tauri_plugin_autostart::ManagerExt;
         let mgr = app.autolaunch();
         if settings.launch_at_startup {
-            mgr.enable().map_err(|e| e.to_string())?;
+            let _ = mgr.enable();
         } else {
-            mgr.disable().map_err(|e| e.to_string())?;
+            let _ = mgr.disable();
         }
     }
 
