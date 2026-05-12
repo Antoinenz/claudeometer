@@ -463,6 +463,7 @@ function RuleList({ rules, onChange }: {
 
 export default function Settings({ auth, onBack, onLogout }: Props) {
   const [settings, setSettings]           = useState<SettingsType>(DEFAULT_SETTINGS);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [ntfyTesting, setNtfyTesting]     = useState(false);
   const [ntfyTestOk, setNtfyTestOk]       = useState(false);
   const [ntfyTestError, setNtfyTestError] = useState<string | null>(null);
@@ -470,7 +471,12 @@ export default function Settings({ auth, onBack, onLogout }: Props) {
   const isLoaded = useRef(false);
 
   useEffect(() => {
-    invoke<SettingsType>("get_settings").then((s) => setSettings(s));
+    invoke<SettingsType>("get_settings").then((s) => {
+      setSettings(s);
+      // Re-enable transitions only after the browser has painted the correct values,
+      // otherwise the toggle thumbs animate from their defaults to the saved positions.
+      requestAnimationFrame(() => requestAnimationFrame(() => setSettingsLoaded(true)));
+    });
     getVersion().then((v) => setAppVersion(v));
   }, []);
 
@@ -544,7 +550,7 @@ export default function Settings({ auth, onBack, onLogout }: Props) {
         <WindowControls />
       </div>
 
-      <div className="flex-1 overflow-y-auto overscroll-y-none px-3.5 py-3.5 space-y-4">
+      <div className={`flex-1 overflow-y-auto overscroll-y-none px-3.5 py-3.5 space-y-4 ${!settingsLoaded ? "[&_*]:!transition-none" : ""}`}>
         <Section title="General">
           <Toggle label="Launch at startup"
             value={settings.launch_at_startup}
