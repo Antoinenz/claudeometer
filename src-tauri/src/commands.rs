@@ -1,4 +1,4 @@
-use crate::claude::{fetch_claude_usage, verify_api_key, UsageData};
+use crate::claude::{fetch_claude_usage, UsageData};
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 use tauri_plugin_notification::NotificationExt;
@@ -6,7 +6,7 @@ use tauri_plugin_store::StoreExt;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AuthState {
-    pub mode: String, // "none" | "session_key" | "api_key"
+    pub mode: String, // "none" | "session_key"
     pub email: Option<String>,
     pub name: Option<String>,
 }
@@ -100,25 +100,10 @@ pub async fn save_session_key(app: AppHandle, key: String) -> Result<AuthState, 
 }
 
 #[tauri::command]
-pub async fn save_api_key(app: AppHandle, key: String) -> Result<AuthState, String> {
-    verify_api_key(&key).await?;
-    let store = app.store("store.json").unwrap();
-    store.set("auth_mode", "api_key");
-    store.set("api_key", key.clone());
-    store.save().map_err(|e| e.to_string())?;
-    Ok(AuthState {
-        mode: "api_key".to_string(),
-        email: None,
-        name: None,
-    })
-}
-
-#[tauri::command]
 pub async fn logout(app: AppHandle) -> Result<(), String> {
     let store = app.store("store.json").unwrap();
     store.set("auth_mode", "none");
     store.delete("session_key");
-    store.delete("api_key");
     store.delete("email");
     store.delete("name");
     store.save().map_err(|e| e.to_string())?;
@@ -140,13 +125,6 @@ pub async fn fetch_usage(app: AppHandle) -> Result<UsageData, String> {
                 .and_then(|v| v.as_str().map(str::to_string))
                 .ok_or("No session key stored")?;
             fetch_claude_usage(&key).await
-        }
-        "api_key" => {
-            let key = store
-                .get("api_key")
-                .and_then(|v| v.as_str().map(str::to_string))
-                .ok_or("No API key stored")?;
-            verify_api_key(&key).await
         }
         _ => Err("Not authenticated".to_string()),
     };

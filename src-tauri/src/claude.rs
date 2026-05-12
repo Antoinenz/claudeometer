@@ -168,28 +168,3 @@ pub async fn fetch_claude_usage(session_key: &str) -> Result<UsageData, String> 
     })
 }
 
-pub async fn verify_api_key(api_key: &str) -> Result<UsageData, String> {
-    let resp = make_client()
-        .map_err(|e| e.to_string())?
-        .get("https://api.anthropic.com/v1/models")
-        .header("x-api-key", api_key)
-        .header("anthropic-version", "2023-06-01")
-        .send()
-        .await
-        .map_err(|e| format!("Network error: {e}"))?;
-
-    if resp.status().is_success() {
-        Ok(UsageData {
-            five_hour: None,
-            seven_day: None,
-            seven_day_sonnet: None,
-            org_name: None,
-            name: None,
-            email: None,
-            fetched_at: chrono::Utc::now().to_rfc3339(),
-            source: "api_key".to_string(),
-        })
-    } else {
-        Err(format!("Invalid API key ({})", resp.status()))
-    }
-}

@@ -654,16 +654,10 @@ export default function Settings({ auth, onBack, onLogout }: Props) {
             </div>
             <div className="min-w-0 flex-1">
               {auth.name && <p className="text-[13px] text-zinc-200 truncate">{auth.name}</p>}
-              {auth.email ? (
+              {auth.email && (
                 <p className={`${auth.name ? "text-[11.5px] text-zinc-500" : "text-[13px] text-zinc-300"} truncate`}>
                   {auth.email}
                 </p>
-              ) : (
-                !auth.name && (
-                  <p className="text-[13px] text-zinc-400">
-                    {auth.mode === "api_key" ? "API Key" : "Session key"}
-                  </p>
-                )
               )}
             </div>
           </div>

@@ -15,7 +15,7 @@ export interface UsageData {
 }
 
 export interface AuthState {
-  mode: "none" | "session_key" | "api_key";
+  mode: "none" | "session_key";
   email: string | null;
   name: string | null;
 }

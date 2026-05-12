@@ -4,14 +4,11 @@ import { open as openUrl } from "@tauri-apps/plugin-shell";
 import { AuthState } from "../lib/types";
 import WindowControls from "../components/WindowControls";
 
-type Mode = "session" | "api";
-
 interface Props {
   onLogin: (auth: AuthState) => void;
 }
 
 export default function Login({ onLogin }: Props) {
-  const [mode, setMode] = useState<Mode>("session");
   const [key, setKey] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,10 +19,7 @@ export default function Login({ onLogin }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const auth = await invoke<AuthState>(
-        mode === "session" ? "save_session_key" : "save_api_key",
-        { key: trimmed }
-      );
+      const auth = await invoke<AuthState>("save_session_key", { key: trimmed });
       onLogin(auth);
     } catch (e) {
       setError(String(e));
@@ -53,51 +47,25 @@ export default function Login({ onLogin }: Props) {
           <p className="text-[12.5px] text-zinc-500 mt-0.5">Monitor your Claude usage limits</p>
         </div>
 
-        {/* Mode tabs */}
-        <div className="flex rounded-lg bg-zinc-900/80 border border-zinc-800 p-0.5 mb-4 gap-0.5">
-          {(["session", "api"] as Mode[]).map((m) => (
-            <button
-              key={m}
-              onClick={() => { setMode(m); setError(null); setKey(""); }}
-              className={`flex-1 text-[12.5px] py-1.5 rounded-md transition-all ${
-                mode === m
-                  ? "bg-zinc-800 text-zinc-100 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]"
-                  : "text-zinc-500 hover:text-zinc-300"
-              }`}
-            >
-              {m === "session" ? "Claude.ai" : "API Key"}
-            </button>
-          ))}
-        </div>
-
         {/* Instructions */}
-        {mode === "session" ? (
-          <div className="space-y-3 mb-4">
-            <p className="text-[12px] text-zinc-500 leading-relaxed">
-              Paste your <code className="text-amber-500 bg-amber-500/10 px-1 rounded text-[11px] font-mono">sessionKey</code> cookie
-              from Claude.ai. It stays on your device and is only used to fetch your usage.
-            </p>
-            <ol className="rounded-lg bg-zinc-900/70 border border-zinc-800 divide-y divide-zinc-800/80 overflow-hidden">
-              {[
-                <>Open <button onClick={() => openUrl("https://claude.ai")} className="text-amber-500 hover:text-amber-400 underline-offset-2 hover:underline">claude.ai</button> and sign in</>,
-                <>Open <span className="text-zinc-300">DevTools → Application → Cookies</span></>,
-                <>Copy the value of <code className="text-amber-500 text-[11px] font-mono">sessionKey</code></>,
-              ].map((step, i) => (
-                <li key={i} className="flex items-start gap-2.5 px-3 py-2">
-                  <span className="text-[10px] text-zinc-600 font-mono mt-[3px] tabular-nums w-3 text-right">{i + 1}</span>
-                  <span className="text-[12px] text-zinc-400 leading-relaxed">{step}</span>
-                </li>
-              ))}
-            </ol>
-          </div>
-        ) : (
-          <div className="mb-4">
-            <p className="text-[12px] text-zinc-500 leading-relaxed">
-              Enter your Anthropic API key. Usage limits aren't available via API —
-              use a Claude.ai session key for full limit tracking.
-            </p>
-          </div>
-        )}
+        <div className="space-y-3 mb-4">
+          <p className="text-[12px] text-zinc-500 leading-relaxed">
+            Paste your <code className="text-amber-500 bg-amber-500/10 px-1 rounded text-[11px] font-mono">sessionKey</code> cookie
+            from Claude.ai. It stays on your device and is only used to fetch your usage.
+          </p>
+          <ol className="rounded-lg bg-zinc-900/70 border border-zinc-800 divide-y divide-zinc-800/80 overflow-hidden">
+            {[
+              <>Open <button onClick={() => openUrl("https://claude.ai")} className="text-amber-500 hover:text-amber-400 underline-offset-2 hover:underline">claude.ai</button> and sign in</>,
+              <>Open <span className="text-zinc-300">DevTools → Application → Cookies</span></>,
+              <>Copy the value of <code className="text-amber-500 text-[11px] font-mono">sessionKey</code></>,
+            ].map((step, i) => (
+              <li key={i} className="flex items-start gap-2.5 px-3 py-2">
+                <span className="text-[10px] text-zinc-600 font-mono mt-[3px] tabular-nums w-3 text-right">{i + 1}</span>
+                <span className="text-[12px] text-zinc-400 leading-relaxed">{step}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
 
         {/* Key input + connect */}
         <div className="space-y-2.5">
@@ -106,7 +74,7 @@ export default function Login({ onLogin }: Props) {
             value={key}
             onChange={(e) => setKey(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleConnect()}
-            placeholder={mode === "session" ? "sk-ant-sid01-..." : "sk-ant-api03-..."}
+            placeholder="sk-ant-sid01-..."
             className="w-full bg-zinc-900/70 border border-zinc-800 rounded-lg px-3 py-2 text-[12.5px] text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-600/50 focus:bg-zinc-900 font-mono transition-colors"
             autoFocus
           />

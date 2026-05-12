@@ -11,7 +11,7 @@ A small desktop app for monitoring your [Claude.ai](https://claude.ai) usage lim
 - Refresh on window focus
 - Desktop notifications with customisable rules (threshold, spike, reset soon, recovery)
 - [ntfy](https://ntfy.sh) push notification support
-- Supports both Claude.ai session keys and Anthropic API keys
+- Supports Claude.ai session key authentication
 
 ## Getting started
 
@@ -36,7 +36,7 @@ npm run tauri build
 
 ## Authentication
 
-Claudeometer uses your Claude.ai **session key** to read usage data. Usage limit tracking is only available via session key — API keys will connect but won't show limit data.
+Claudeometer uses your Claude.ai **session key** to read usage data.
 
 **How to get your session key:**
 

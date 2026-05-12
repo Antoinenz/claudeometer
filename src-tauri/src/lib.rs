@@ -51,7 +51,6 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_auth_state,
             save_session_key,
-            save_api_key,
             logout,
             fetch_usage,
             get_settings,
@@ -172,15 +171,6 @@ async fn poll_once(app: &AppHandle, poll_state: &SharedPollState) {
                 .and_then(|v| v.as_str().map(str::to_string));
             match key {
                 Some(k) => claude::fetch_claude_usage(&k).await,
-                None => return,
-            }
-        }
-        "api_key" => {
-            let key = store
-                .get("api_key")
-                .and_then(|v| v.as_str().map(str::to_string));
-            match key {
-                Some(k) => claude::verify_api_key(&k).await,
                 None => return,
             }
         }

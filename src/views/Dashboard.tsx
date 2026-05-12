@@ -191,41 +191,34 @@ export default function Dashboard({ usage, error, isRefreshing, cooldownEndsAt, 
 
             {usage && (
               <>
-                {usage.source === "api_key" ? (
-                  <div className="rounded-xl bg-zinc-900/70 border border-zinc-800/80 px-4 py-7 text-center space-y-1.5">
-                    <p className="text-sm text-zinc-300">Usage limits unavailable</p>
-                    <p className="text-xs text-zinc-500">API keys don't expose usage data — sign in with a Claude.ai session key.</p>
-                  </div>
-                ) : (
-                  <>
-                    {!usage.five_hour && !usage.seven_day && !usage.seven_day_sonnet && (
-                      <div className="rounded-xl bg-zinc-900/70 border border-zinc-800/80 px-4 py-7 text-center">
-                        <p className="text-sm text-zinc-500">No usage data returned.</p>
-                      </div>
-                    )}
-                    {usage.five_hour && (
-                      <UsageBar
-                        label="5-hour"
-                        utilization={usage.five_hour.utilization}
-                        resetsAt={usage.five_hour.resets_at}
-                      />
-                    )}
-                    {usage.seven_day && (
-                      <UsageBar
-                        label="7-day"
-                        utilization={usage.seven_day.utilization}
-                        resetsAt={usage.seven_day.resets_at}
-                      />
-                    )}
-                    {usage.seven_day_sonnet && (
-                      <UsageBar
-                        label="7-day Sonnet"
-                        utilization={usage.seven_day_sonnet.utilization}
-                        resetsAt={usage.seven_day_sonnet.resets_at}
-                      />
-                    )}
-                  </>
-                )}
+                <>
+                  {!usage.five_hour && !usage.seven_day && !usage.seven_day_sonnet && (
+                    <div className="rounded-xl bg-zinc-900/70 border border-zinc-800/80 px-4 py-7 text-center">
+                      <p className="text-sm text-zinc-500">No usage data returned.</p>
+                    </div>
+                  )}
+                  {usage.five_hour && (
+                    <UsageBar
+                      label="5-hour"
+                      utilization={usage.five_hour.utilization}
+                      resetsAt={usage.five_hour.resets_at}
+                    />
+                  )}
+                  {usage.seven_day && (
+                    <UsageBar
+                      label="7-day"
+                      utilization={usage.seven_day.utilization}
+                      resetsAt={usage.seven_day.resets_at}
+                    />
+                  )}
+                  {usage.seven_day_sonnet && (
+                    <UsageBar
+                      label="7-day Sonnet"
+                      utilization={usage.seven_day_sonnet.utilization}
+                      resetsAt={usage.seven_day_sonnet.resets_at}
+                    />
+                  )}
+                </>
               </>
             )}
           </div>
