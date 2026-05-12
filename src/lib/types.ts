@@ -20,15 +20,22 @@ export interface AuthState {
   name: string | null;
 }
 
+// Discriminated union — matches the Rust NotificationRule serde tag
+export type NotificationRule =
+  | { type: "threshold"; id: string; window: string; at_pct: number }
+  | { type: "spike";     id: string; window: string; by_pct: number }
+  | { type: "reset_soon"; id: string; window: string; within_mins: number }
+  | { type: "recovery";  id: string; window: string; below_pct: number };
+
 export interface Settings {
   launch_at_startup: boolean;
   minimize_to_tray: boolean;
-  desktop_notifications: boolean;
-  notification_threshold: number;
-  poll_interval_secs: number;
+  notification_rules: NotificationRule[];
   ntfy_enabled: boolean;
   ntfy_server: string;
   ntfy_topic: string;
+  ntfy_rules: NotificationRule[];
+  poll_interval_secs: number;
   precise_timestamp: boolean;
   auto_poll: boolean;
   foreground_poll: boolean;
@@ -37,12 +44,12 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   launch_at_startup: false,
   minimize_to_tray: true,
-  desktop_notifications: true,
-  notification_threshold: 80,
-  poll_interval_secs: 60,
+  notification_rules: [],
   ntfy_enabled: false,
   ntfy_server: "https://ntfy.sh",
   ntfy_topic: "claudeometer",
+  ntfy_rules: [],
+  poll_interval_secs: 60,
   precise_timestamp: false,
   auto_poll: true,
   foreground_poll: true,

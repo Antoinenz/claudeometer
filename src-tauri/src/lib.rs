@@ -2,6 +2,8 @@ mod claude;
 mod commands;
 
 use commands::*;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::{
     menu::{Menu, MenuItem},
@@ -10,8 +12,28 @@ use tauri::{
 };
 use tauri_plugin_store::StoreExt;
 
+/// Tracks utilization and reset-countdown values from the previous poll
+/// so we can implement edge-triggered notification rules.
+struct PollState {
+    prev_util: HashMap<String, f64>,
+    prev_reset_mins: HashMap<String, f64>,
+}
+
+impl Default for PollState {
+    fn default() -> Self {
+        Self {
+            prev_util: HashMap::new(),
+            prev_reset_mins: HashMap::new(),
+        }
+    }
+}
+
+type SharedPollState = Arc<Mutex<PollState>>;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let poll_state: SharedPollState = Arc::new(Mutex::new(PollState::default()));
+
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
@@ -20,9 +42,9 @@ pub fn run() {
         ))
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_shell::init())
-        .setup(|app| {
+        .setup(move |app| {
             setup_tray(app)?;
-            start_polling(app.handle().clone());
+            start_polling(app.handle().clone(), poll_state);
             setup_close_behavior(app)?;
             Ok(())
         })
@@ -58,7 +80,6 @@ fn setup_tray(app: &mut tauri::App) -> tauri::Result<()> {
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
-            // Only fire on left-button-up to avoid double-toggle on click+release
             if let TrayIconEvent::Click {
                 button: tauri::tray::MouseButton::Left,
                 button_state: tauri::tray::MouseButtonState::Up,
@@ -108,18 +129,18 @@ fn setup_close_behavior(app: &mut tauri::App) -> tauri::Result<()> {
     Ok(())
 }
 
-fn start_polling(app: AppHandle) {
+fn start_polling(app: AppHandle, poll_state: SharedPollState) {
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(Duration::from_secs(3)).await;
         loop {
-            poll_once(&app).await;
+            poll_once(&app, &poll_state).await;
             let interval = get_poll_interval(&app);
             tokio::time::sleep(Duration::from_secs(interval)).await;
         }
     });
 }
 
-async fn poll_once(app: &AppHandle) {
+async fn poll_once(app: &AppHandle, poll_state: &SharedPollState) {
     let store = match app.store("store.json") {
         Ok(s) => s,
         Err(_) => return,
@@ -169,7 +190,7 @@ async fn poll_once(app: &AppHandle) {
     match result {
         Ok(usage) => {
             let _ = app.emit("usage-updated", &usage);
-            check_thresholds(app, &usage).await;
+            check_notification_rules(app, &usage, poll_state).await;
         }
         Err(e) => {
             let _ = app.emit("usage-error", e);
@@ -177,7 +198,149 @@ async fn poll_once(app: &AppHandle) {
     }
 }
 
-async fn check_thresholds(app: &AppHandle, usage: &claude::UsageData) {
+// ── Rule evaluation ──────────────────────────────────────────────────────────
+
+fn window_utilizations(usage: &claude::UsageData) -> HashMap<String, f64> {
+    let mut map = HashMap::new();
+    if let Some(ref w) = usage.five_hour {
+        map.insert("five_hour".to_string(), w.utilization);
+    }
+    if let Some(ref w) = usage.seven_day {
+        map.insert("seven_day".to_string(), w.utilization);
+    }
+    if let Some(ref w) = usage.seven_day_sonnet {
+        map.insert("seven_day_sonnet".to_string(), w.utilization);
+    }
+    map
+}
+
+fn window_reset_mins(usage: &claude::UsageData) -> HashMap<String, f64> {
+    let mut map = HashMap::new();
+    let windows: [(&str, &Option<claude::UsageWindow>); 3] = [
+        ("five_hour", &usage.five_hour),
+        ("seven_day", &usage.seven_day),
+        ("seven_day_sonnet", &usage.seven_day_sonnet),
+    ];
+    for (key, window) in &windows {
+        if let Some(w) = window {
+            if let Some(ref resets_at) = w.resets_at {
+                if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(resets_at) {
+                    let mins =
+                        (dt.timestamp() - chrono::Utc::now().timestamp()) as f64 / 60.0;
+                    map.insert(key.to_string(), mins.max(0.0));
+                }
+            }
+        }
+    }
+    map
+}
+
+fn get_util(window: &str, map: &HashMap<String, f64>) -> f64 {
+    if window == "any" {
+        map.values().copied().fold(0.0_f64, f64::max)
+    } else {
+        map.get(window).copied().unwrap_or(0.0)
+    }
+}
+
+fn rule_fires(
+    rule: &NotificationRule,
+    cur_util: &HashMap<String, f64>,
+    cur_reset: &HashMap<String, f64>,
+    prev_util: &HashMap<String, f64>,
+    prev_reset: &HashMap<String, f64>,
+) -> bool {
+    // All edge-triggered rules are suppressed on the very first poll (prev is empty)
+    // to prevent a burst of notifications on app start.
+    match rule {
+        NotificationRule::Threshold { window, at_pct, .. } => {
+            if prev_util.is_empty() { return false; }
+            let cur = get_util(window, cur_util);
+            let prev = get_util(window, prev_util);
+            cur >= *at_pct && prev < *at_pct
+        }
+        NotificationRule::Spike { window, by_pct, .. } => {
+            if prev_util.is_empty() { return false; }
+            let cur = get_util(window, cur_util);
+            let prev = get_util(window, prev_util);
+            cur > prev && (cur - prev) >= *by_pct
+        }
+        NotificationRule::ResetSoon { window, within_mins, .. } => {
+            if prev_reset.is_empty() { return false; }
+            let cur = cur_reset.get(window.as_str()).copied().unwrap_or(f64::MAX);
+            let prev = prev_reset.get(window.as_str()).copied().unwrap_or(f64::MAX);
+            let threshold = *within_mins as f64;
+            cur <= threshold && prev > threshold
+        }
+        NotificationRule::Recovery { window, below_pct, .. } => {
+            if prev_util.is_empty() { return false; }
+            let cur = get_util(window, cur_util);
+            let prev = get_util(window, prev_util);
+            cur <= *below_pct && prev > *below_pct
+        }
+    }
+}
+
+fn window_label(window: &str) -> &str {
+    match window {
+        "five_hour" => "5-hour",
+        "seven_day" => "7-day",
+        "seven_day_sonnet" => "7-day Sonnet",
+        _ => "usage",
+    }
+}
+
+fn rule_message(rule: &NotificationRule, cur_util: &HashMap<String, f64>) -> (String, String) {
+    match rule {
+        NotificationRule::Threshold { window, at_pct, .. } => {
+            let val = get_util(window, cur_util);
+            (
+                "Claude Usage Alert".to_string(),
+                format!(
+                    "{} usage reached {:.0}% (threshold: {:.0}%)",
+                    window_label(window), val, at_pct
+                ),
+            )
+        }
+        NotificationRule::Spike { window, by_pct, .. } => {
+            let val = get_util(window, cur_util);
+            (
+                "Claude Usage Spike".to_string(),
+                format!(
+                    "{} usage jumped by {:.0}% — now at {:.0}%",
+                    window_label(window), by_pct, val
+                ),
+            )
+        }
+        NotificationRule::ResetSoon { window, within_mins, .. } => {
+            let label = if *within_mins >= 60 {
+                format!("{}h", within_mins / 60)
+            } else {
+                format!("{within_mins}m")
+            };
+            (
+                "Claude Limit Resetting".to_string(),
+                format!("{} limit resets within {}", window_label(window), label),
+            )
+        }
+        NotificationRule::Recovery { window, below_pct, .. } => {
+            let val = get_util(window, cur_util);
+            (
+                "Claude Usage Recovered".to_string(),
+                format!(
+                    "{} usage dropped to {:.0}% (below {:.0}%)",
+                    window_label(window), val, below_pct
+                ),
+            )
+        }
+    }
+}
+
+async fn check_notification_rules(
+    app: &AppHandle,
+    usage: &claude::UsageData,
+    state: &SharedPollState,
+) {
     let settings: Settings = app
         .store("store.json")
         .ok()
@@ -185,34 +348,50 @@ async fn check_thresholds(app: &AppHandle, usage: &claude::UsageData) {
         .and_then(|v| serde_json::from_value(v).ok())
         .unwrap_or_default();
 
-    let Some(pct) = usage.max_utilization() else {
-        return;
+    let cur_util = window_utilizations(usage);
+    let cur_reset = window_reset_mins(usage);
+
+    // Snapshot prev values without holding the lock across any await
+    let (prev_util, prev_reset) = {
+        let s = state.lock().unwrap();
+        (s.prev_util.clone(), s.prev_reset_mins.clone())
     };
 
-    if pct < settings.notification_threshold as f64 {
-        return;
+    // Desktop notifications
+    for rule in &settings.notification_rules {
+        if rule_fires(rule, &cur_util, &cur_reset, &prev_util, &prev_reset) {
+            let (title, body) = rule_message(rule, &cur_util);
+            use tauri_plugin_notification::NotificationExt;
+            let _ = app.notification().builder().title(&title).body(&body).show();
+        }
     }
 
-    let title = "Claude Usage Alert".to_string();
-    let body = format!("You've used {pct:.0}% of your usage limit.");
-
-    if settings.desktop_notifications {
-        use tauri_plugin_notification::NotificationExt;
-        let _ = app.notification().builder().title(&title).body(&body).show();
-    }
-
+    // ntfy notifications
     if settings.ntfy_enabled && !settings.ntfy_topic.is_empty() {
-        let url = format!(
-            "{}/{}",
-            settings.ntfy_server.trim_end_matches('/'),
-            settings.ntfy_topic
-        );
-        let _ = reqwest::Client::new()
-            .post(&url)
-            .header("Title", &title)
-            .body(body)
-            .send()
-            .await;
+        for rule in &settings.ntfy_rules {
+            if rule_fires(rule, &cur_util, &cur_reset, &prev_util, &prev_reset) {
+                let (title, body) = rule_message(rule, &cur_util);
+                let url = format!(
+                    "{}/{}",
+                    settings.ntfy_server.trim_end_matches('/'),
+                    settings.ntfy_topic,
+                );
+                let _ = reqwest::Client::new()
+                    .post(&url)
+                    .header("Title", &title)
+                    .header("Priority", "default")
+                    .body(body)
+                    .send()
+                    .await;
+            }
+        }
+    }
+
+    // Update state after all awaits are done
+    {
+        let mut s = state.lock().unwrap();
+        s.prev_util = cur_util;
+        s.prev_reset_mins = cur_reset;
     }
 }
 

@@ -11,16 +11,31 @@ pub struct AuthState {
     pub name: Option<String>,
 }
 
+/// A single notification rule. Serde tag = "type" so the JSON looks like
+/// {"type":"threshold","id":"abc","window":"five_hour","at_pct":80.0}
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum NotificationRule {
+    /// Fire when a window's utilization crosses above at_pct (rising edge).
+    Threshold { id: String, window: String, at_pct: f64 },
+    /// Fire when a window's utilization jumps by >= by_pct since the last poll.
+    Spike { id: String, window: String, by_pct: f64 },
+    /// Fire when a window will reset within within_mins minutes (falling-edge on the countdown).
+    ResetSoon { id: String, window: String, within_mins: u32 },
+    /// Fire when a window's utilization crosses below below_pct (falling edge).
+    Recovery { id: String, window: String, below_pct: f64 },
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Settings {
     pub launch_at_startup: bool,
     pub minimize_to_tray: bool,
-    pub desktop_notifications: bool,
-    pub notification_threshold: u8,
-    pub poll_interval_secs: u64,
+    pub notification_rules: Vec<NotificationRule>,
     pub ntfy_enabled: bool,
     pub ntfy_server: String,
     pub ntfy_topic: String,
+    pub ntfy_rules: Vec<NotificationRule>,
+    pub poll_interval_secs: u64,
     pub precise_timestamp: bool,
     pub auto_poll: bool,
     pub foreground_poll: bool,
@@ -31,12 +46,12 @@ impl Default for Settings {
         Self {
             launch_at_startup: false,
             minimize_to_tray: true,
-            desktop_notifications: true,
-            notification_threshold: 80,
-            poll_interval_secs: 60,
+            notification_rules: vec![],
             ntfy_enabled: false,
             ntfy_server: "https://ntfy.sh".to_string(),
             ntfy_topic: "claudeometer".to_string(),
+            ntfy_rules: vec![],
+            poll_interval_secs: 60,
             precise_timestamp: false,
             auto_poll: true,
             foreground_poll: true,
@@ -159,7 +174,6 @@ pub async fn get_settings(app: AppHandle) -> Settings {
 
 #[tauri::command]
 pub async fn save_settings(app: AppHandle, settings: Settings) -> Result<(), String> {
-    // Apply autostart (ignore errors — plugin may not be registered yet on first run)
     #[cfg(desktop)]
     {
         use tauri_plugin_autostart::ManagerExt;
@@ -188,14 +202,18 @@ pub async fn send_ntfy(
     body: String,
 ) -> Result<(), String> {
     let url = format!("{}/{}", server.trim_end_matches('/'), topic);
-    reqwest::Client::new()
+    let resp = reqwest::Client::new()
         .post(&url)
         .header("Title", &title)
         .header("Priority", "default")
         .body(body)
         .send()
         .await
-        .map_err(|e| format!("ntfy error: {e}"))?;
+        .map_err(|e| format!("Connection failed: {e}"))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("ntfy returned {}", resp.status()));
+    }
     Ok(())
 }
 
