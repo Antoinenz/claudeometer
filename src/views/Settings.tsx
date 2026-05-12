@@ -26,20 +26,20 @@ function Toggle({
   return (
     <div className="flex items-center justify-between gap-4">
       <div className="min-w-0 flex-1">
-        <p className="text-sm text-zinc-200">{label}</p>
+        <p className="text-[13px] text-zinc-200">{label}</p>
         {description && (
-          <p className="text-xs text-zinc-500 mt-0.5 leading-relaxed">{description}</p>
+          <p className="text-[11.5px] text-zinc-500 mt-0.5 leading-relaxed">{description}</p>
         )}
       </div>
       <button
         onClick={() => onChange(!value)}
-        className={`relative shrink-0 w-9 h-5 rounded-full transition-colors ${
-          value ? "bg-amber-600" : "bg-zinc-700"
+        className={`relative shrink-0 w-[34px] h-[19px] rounded-full transition-colors ${
+          value ? "bg-amber-600" : "bg-zinc-700/80"
         }`}
       >
         <span
-          className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${
-            value ? "translate-x-4" : "translate-x-0"
+          className={`absolute top-[2px] left-[2px] w-[15px] h-[15px] rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.4)] transition-transform duration-150 ${
+            value ? "translate-x-[15px]" : "translate-x-0"
           }`}
         />
       </button>
@@ -62,13 +62,13 @@ function Field({
 }) {
   return (
     <div className="space-y-1.5">
-      <label className="text-xs text-zinc-500">{label}</label>
+      <label className="text-[11px] text-zinc-500 font-medium">{label}</label>
       <input
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-600/50"
+        className="w-full bg-zinc-950/60 border border-zinc-800 rounded-md px-2.5 py-1.5 text-[12.5px] text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-600/50 focus:bg-zinc-950 transition-colors font-mono"
       />
     </div>
   );
@@ -76,26 +76,46 @@ function Field({
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl bg-zinc-900 border border-zinc-800 overflow-hidden">
-      <div className="px-4 py-2.5 border-b border-zinc-800/60">
-        <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">{title}</p>
+    <div className="space-y-2">
+      <p className="text-[10.5px] font-semibold text-zinc-500 uppercase tracking-[0.08em] px-1">{title}</p>
+      <div className="rounded-xl bg-zinc-900/70 border border-zinc-800/80 px-3.5 py-3 space-y-3.5">
+        {children}
       </div>
-      <div className="px-4 py-4 space-y-4">{children}</div>
     </div>
+  );
+}
+
+function Slider({ value, min, max, step, onChange }: {
+  value: number; min: number; max: number; step: number;
+  onChange: (v: number) => void;
+}) {
+  const pct = ((value - min) / (max - min)) * 100;
+  return (
+    <input
+      type="range"
+      min={min}
+      max={max}
+      step={step}
+      value={value}
+      onChange={(e) => onChange(Number(e.target.value))}
+      style={{ ["--range-progress" as string]: `${pct}%` }}
+      className="flex-1"
+    />
   );
 }
 
 // ── Rule helpers ─────────────────────────────────────────────────────────────
 
 const WINDOWS_ALL = [
-  { value: "five_hour",       label: "5-hour"  },
-  { value: "seven_day",       label: "7-day"   },
-  { value: "seven_day_sonnet",label: "Sonnet"  },
-  { value: "any",             label: "Any"     },
+  { value: "five_hour",        label: "5-hour" },
+  { value: "seven_day",        label: "7-day"  },
+  { value: "seven_day_sonnet", label: "Sonnet" },
+  { value: "any",              label: "Any"    },
 ];
 const WINDOWS_SPECIFIC = WINDOWS_ALL.slice(0, 3);
 
 const RESET_OPTIONS = [
+  { value: 5,   label: "5m"  },
   { value: 15,  label: "15m" },
   { value: 30,  label: "30m" },
   { value: 60,  label: "1h"  },
@@ -105,8 +125,8 @@ const RESET_OPTIONS = [
 const RULE_TYPES: { type: NotificationRule["type"]; label: string; description: string }[] = [
   { type: "threshold",  label: "Usage threshold",      description: "Alert when a window reaches a percentage" },
   { type: "spike",      label: "Usage spike",          description: "Alert when usage jumps between polls"     },
-  { type: "reset_soon", label: "Limit resetting soon", description: "Alert before a window resets"            },
-  { type: "recovery",   label: "Usage recovery",       description: "Alert when usage drops below a level"    },
+  { type: "reset_soon", label: "Limit resetting soon", description: "Alert before a window resets"             },
+  { type: "recovery",   label: "Usage recovery",       description: "Alert when usage drops below a level"     },
 ];
 
 function ruleTypeLabel(type: NotificationRule["type"]): string {
@@ -147,15 +167,15 @@ function WindowPicker({ windows, value, onChange }: {
   onChange: (v: string) => void;
 }) {
   return (
-    <div className="flex gap-1.5">
+    <div className="flex gap-1 p-0.5 rounded-md bg-zinc-950/60 border border-zinc-800">
       {windows.map((w) => (
         <button
           key={w.value}
           onClick={() => onChange(w.value)}
-          className={`flex-1 text-[11px] py-1 rounded border transition-colors ${
+          className={`flex-1 text-[11px] py-1 rounded transition-all ${
             value === w.value
-              ? "bg-amber-600/10 border-amber-600/40 text-amber-500"
-              : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-zinc-200"
+              ? "bg-zinc-800 text-zinc-100 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]"
+              : "text-zinc-500 hover:text-zinc-300"
           }`}
         >
           {w.label}
@@ -174,7 +194,7 @@ function RuleEditor({ rule, onChange }: {
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
-        <p className="text-[10px] font-medium text-zinc-500 uppercase tracking-wide">Window</p>
+        <p className="text-[10.5px] font-medium text-zinc-500 uppercase tracking-wide">Window</p>
         {rule.type === "threshold" || rule.type === "recovery" ? (
           <WindowPicker windows={WINDOWS_ALL}     value={rule.window}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -188,39 +208,37 @@ function RuleEditor({ rule, onChange }: {
 
       {rule.type === "threshold" && (
         <div className="space-y-1.5">
-          <p className="text-[10px] font-medium text-zinc-500 uppercase tracking-wide">Alert when above</p>
+          <p className="text-[10.5px] font-medium text-zinc-500 uppercase tracking-wide">Alert when above</p>
           <div className="flex items-center gap-3">
-            <input type="range" min={10} max={100} step={5} value={rule.at_pct}
-              onChange={(e) => onChange({ ...rule, at_pct: Number(e.target.value) })}
-              className="flex-1 accent-amber-600" />
-            <span className="text-sm text-zinc-300 tabular-nums w-8 text-right">{rule.at_pct}%</span>
+            <Slider value={rule.at_pct} min={10} max={100} step={5}
+              onChange={(v) => onChange({ ...rule, at_pct: v })} />
+            <span className="text-[12.5px] text-zinc-200 tabular-nums font-mono w-9 text-right">{rule.at_pct}%</span>
           </div>
         </div>
       )}
 
       {rule.type === "spike" && (
         <div className="space-y-1.5">
-          <p className="text-[10px] font-medium text-zinc-500 uppercase tracking-wide">Jump of at least</p>
+          <p className="text-[10.5px] font-medium text-zinc-500 uppercase tracking-wide">Jump of at least</p>
           <div className="flex items-center gap-3">
-            <input type="range" min={5} max={50} step={5} value={rule.by_pct}
-              onChange={(e) => onChange({ ...rule, by_pct: Number(e.target.value) })}
-              className="flex-1 accent-amber-600" />
-            <span className="text-sm text-zinc-300 tabular-nums w-8 text-right">{rule.by_pct}%</span>
+            <Slider value={rule.by_pct} min={5} max={50} step={5}
+              onChange={(v) => onChange({ ...rule, by_pct: v })} />
+            <span className="text-[12.5px] text-zinc-200 tabular-nums font-mono w-9 text-right">{rule.by_pct}%</span>
           </div>
-          <p className="text-[10px] text-zinc-600">Between consecutive polls</p>
+          <p className="text-[10.5px] text-zinc-600 leading-relaxed">Between consecutive polls</p>
         </div>
       )}
 
       {rule.type === "reset_soon" && (
         <div className="space-y-1.5">
-          <p className="text-[10px] font-medium text-zinc-500 uppercase tracking-wide">Alert within</p>
-          <div className="flex gap-1.5">
+          <p className="text-[10.5px] font-medium text-zinc-500 uppercase tracking-wide">Alert within</p>
+          <div className="flex gap-1 p-0.5 rounded-md bg-zinc-950/60 border border-zinc-800">
             {RESET_OPTIONS.map((o) => (
               <button key={o.value} onClick={() => onChange({ ...rule, within_mins: o.value })}
-                className={`flex-1 text-xs py-1 rounded border transition-colors ${
+                className={`flex-1 text-[11.5px] py-1 rounded transition-all ${
                   rule.within_mins === o.value
-                    ? "bg-amber-600/10 border-amber-600/40 text-amber-500"
-                    : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-zinc-200"
+                    ? "bg-zinc-800 text-zinc-100 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]"
+                    : "text-zinc-500 hover:text-zinc-300"
                 }`}
               >{o.label}</button>
             ))}
@@ -230,12 +248,11 @@ function RuleEditor({ rule, onChange }: {
 
       {rule.type === "recovery" && (
         <div className="space-y-1.5">
-          <p className="text-[10px] font-medium text-zinc-500 uppercase tracking-wide">Alert when drops below</p>
+          <p className="text-[10.5px] font-medium text-zinc-500 uppercase tracking-wide">Alert when drops below</p>
           <div className="flex items-center gap-3">
-            <input type="range" min={10} max={90} step={5} value={rule.below_pct}
-              onChange={(e) => onChange({ ...rule, below_pct: Number(e.target.value) })}
-              className="flex-1 accent-amber-600" />
-            <span className="text-sm text-zinc-300 tabular-nums w-8 text-right">{rule.below_pct}%</span>
+            <Slider value={rule.below_pct} min={10} max={90} step={5}
+              onChange={(v) => onChange({ ...rule, below_pct: v })} />
+            <span className="text-[12.5px] text-zinc-200 tabular-nums font-mono w-9 text-right">{rule.below_pct}%</span>
           </div>
         </div>
       )}
@@ -245,7 +262,6 @@ function RuleEditor({ rule, onChange }: {
 
 // ── Mac-style rule list with portal dropdown + portal modal editor ────────────
 
-// Topbar height in px — modal backdrop starts below this
 const TOPBAR_H = 41;
 
 function RuleList({ rules, onChange }: {
@@ -255,11 +271,15 @@ function RuleList({ rules, onChange }: {
   const [selectedId, setSelectedId]   = useState<string | null>(null);
   const [editingRule, setEditingRule] = useState<NotificationRule | null>(null);
   const [showAddMenu, setShowAddMenu] = useState(false);
-  const [menuPos, setMenuPos]         = useState({ bottom: 0, left: 0 });
-  const plusRef   = useRef<HTMLButtonElement>(null);
-  const listRef   = useRef<HTMLDivElement>(null);
+  const [menuPos, setMenuPos]         = useState<{ top?: number; bottom?: number; left: number }>({ left: 0 });
+  const plusRef        = useRef<HTMLButtonElement>(null);
+  const listRef        = useRef<HTMLDivElement>(null);
+  const editingRuleRef = useRef<NotificationRule | null>(null);
 
-  // Close modal on Escape
+  // Keep ref in sync so the pointerdown handler below can read it without stale closures
+  useEffect(() => { editingRuleRef.current = editingRule; }, [editingRule]);
+
+  // Escape key closes modal
   useEffect(() => {
     if (!editingRule) return;
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setEditingRule(null); };
@@ -267,9 +287,10 @@ function RuleList({ rules, onChange }: {
     return () => window.removeEventListener("keydown", handler);
   }, [editingRule]);
 
-  // Deselect when clicking anywhere outside this RuleList
+  // Deselect when clicking anywhere outside — but NOT while a modal is open
   useEffect(() => {
     const handler = (e: PointerEvent) => {
+      if (editingRuleRef.current) return; // modal open — backdrop click keeps selection
       if (listRef.current && !listRef.current.contains(e.target as Node)) {
         setSelectedId(null);
       }
@@ -278,10 +299,25 @@ function RuleList({ rules, onChange }: {
     return () => document.removeEventListener("pointerdown", handler);
   }, []);
 
+  // Close the add-type dropdown if the user scrolls
+  useEffect(() => {
+    if (!showAddMenu) return;
+    const handler = () => setShowAddMenu(false);
+    window.addEventListener("scroll", handler, true);
+    return () => window.removeEventListener("scroll", handler, true);
+  }, [showAddMenu]);
+
   const openAddMenu = () => {
     if (plusRef.current) {
       const r = plusRef.current.getBoundingClientRect();
-      setMenuPos({ bottom: window.innerHeight - r.top + 4, left: r.left });
+      const midpoint = window.innerHeight / 2;
+      if (r.top > midpoint) {
+        // Button is in lower half — open upward
+        setMenuPos({ bottom: window.innerHeight - r.top + 4, left: r.left });
+      } else {
+        // Button is in upper half — open downward
+        setMenuPos({ top: r.bottom + 4, left: r.left });
+      }
     }
     setShowAddMenu(true);
   };
@@ -290,7 +326,7 @@ function RuleList({ rules, onChange }: {
     const rule = makeDefaultRule(type);
     onChange([...rules, rule]);
     setSelectedId(rule.id);
-    setEditingRule(rule);  // open modal immediately for new rules
+    setEditingRule(rule);
     setShowAddMenu(false);
   };
 
@@ -313,32 +349,30 @@ function RuleList({ rules, onChange }: {
 
   return (
     <div ref={listRef} className="space-y-1.5">
-      {/* List box */}
-      <div className="rounded-lg border border-zinc-700 overflow-hidden bg-zinc-950 min-h-[72px]">
+      <div className="rounded-md border border-zinc-800 bg-zinc-950/60 h-[135px] overflow-y-auto overscroll-y-none">
         {rules.length === 0 ? (
-          <div className="flex items-center justify-center h-[72px] text-xs text-zinc-600">
+          <div className="flex items-center justify-center h-full text-[11.5px] text-zinc-600">
             No rules — press + to add one
           </div>
         ) : (
           rules.map((rule, i) => (
             <div
               key={rule.id}
-              className={`group flex items-center gap-1 px-3 py-2 text-xs cursor-default transition-colors ${
-                i < rules.length - 1 ? "border-b border-zinc-800" : ""
+              className={`group flex items-center gap-1 px-2.5 py-1.5 text-[12px] cursor-default transition-colors ${
+                i < rules.length - 1 ? "border-b border-zinc-800/80" : ""
               } ${
                 selectedId === rule.id
-                  ? "bg-amber-600/10 text-amber-400"
-                  : "text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200"
+                  ? "bg-amber-600/15 text-amber-300"
+                  : "text-zinc-400 hover:bg-zinc-800/40 hover:text-zinc-200"
               }`}
               onClick={() => setSelectedId(rule.id)}
               onDoubleClick={() => openEditor(rule)}
             >
-              <span className="flex-1 pointer-events-none">{formatRule(rule)}</span>
-              {/* Edit button — visible on hover or when selected */}
+              <span className="flex-1 pointer-events-none truncate">{formatRule(rule)}</span>
               <button
-                className={`shrink-0 p-0.5 rounded transition-colors opacity-0 group-hover:opacity-100 ${
+                className={`shrink-0 p-0.5 rounded transition-opacity opacity-0 group-hover:opacity-100 ${
                   selectedId === rule.id
-                    ? "text-amber-500/60 hover:text-amber-400"
+                    ? "text-amber-400/70 hover:text-amber-300"
                     : "text-zinc-600 hover:text-zinc-300"
                 }`}
                 onClick={(e) => { e.stopPropagation(); openEditor(rule); }}
@@ -354,38 +388,36 @@ function RuleList({ rules, onChange }: {
         )}
       </div>
 
-      {/* + / − controls */}
-      <div className="inline-flex border border-zinc-700 rounded-md overflow-hidden">
+      <div className="inline-flex border border-zinc-800 rounded-md overflow-hidden bg-zinc-950/60">
         <button
           ref={plusRef}
           onClick={openAddMenu}
-          className="w-7 h-7 flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors border-r border-zinc-700 text-base leading-none"
+          className="w-6 h-6 flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/80 transition-colors border-r border-zinc-800 text-sm leading-none"
         >+</button>
         <button
           onClick={removeSelected}
           disabled={!selectedId}
-          className="w-7 h-7 flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors text-base leading-none disabled:opacity-30 disabled:pointer-events-none"
+          className="w-6 h-6 flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/80 transition-colors text-sm leading-none disabled:opacity-30 disabled:pointer-events-none"
         >−</button>
       </div>
 
-      {/* Add-type dropdown — portal so it escapes overflow:hidden */}
       {showAddMenu && createPortal(
         <>
           <div className="fixed inset-0 z-40" onClick={() => setShowAddMenu(false)} />
           <div
-            className="fixed z-50 bg-zinc-900 border border-zinc-700 rounded-lg overflow-hidden w-56 shadow-xl"
-            style={{ bottom: menuPos.bottom, left: menuPos.left }}
+            className="fixed z-50 bg-zinc-900 border border-zinc-700/80 rounded-lg overflow-hidden w-56 shadow-[0_8px_30px_rgba(0,0,0,0.6)]"
+            style={{ top: menuPos.top, bottom: menuPos.bottom, left: menuPos.left }}
           >
             {RULE_TYPES.map((rt, i) => (
               <button
                 key={rt.type}
                 onClick={() => addRule(rt.type)}
-                className={`w-full px-3 py-2.5 text-left transition-colors hover:bg-zinc-800 ${
-                  i < RULE_TYPES.length - 1 ? "border-b border-zinc-800" : ""
+                className={`w-full px-3 py-2 text-left transition-colors hover:bg-zinc-800 ${
+                  i < RULE_TYPES.length - 1 ? "border-b border-zinc-800/80" : ""
                 }`}
               >
-                <p className="text-xs text-zinc-200">{rt.label}</p>
-                <p className="text-[10px] text-zinc-500 mt-0.5">{rt.description}</p>
+                <p className="text-[12px] text-zinc-200 font-medium">{rt.label}</p>
+                <p className="text-[10.5px] text-zinc-500 mt-0.5 leading-snug">{rt.description}</p>
               </button>
             ))}
           </div>
@@ -393,29 +425,28 @@ function RuleList({ rules, onChange }: {
         document.body
       )}
 
-      {/* Rule editor modal — starts below the Settings topbar */}
       {editingRule && createPortal(
         <div
-          className="fixed inset-x-0 bottom-0 bg-[#111111]/75 backdrop-blur-sm flex items-center justify-center z-50 p-5"
+          className="fixed inset-x-0 bottom-0 bg-[#0d0d0d]/80 backdrop-blur-sm flex items-center justify-center z-50 px-4 py-4"
           style={{ top: TOPBAR_H }}
           onClick={() => setEditingRule(null)}
         >
           <div
-            className="bg-zinc-900 border border-zinc-800 rounded-xl w-full shadow-2xl"
+            className="bg-zinc-900 border border-zinc-700/60 rounded-xl w-full shadow-[0_12px_48px_rgba(0,0,0,0.7)]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
-              <p className="text-sm font-medium text-zinc-200">{ruleTypeLabel(editingRule.type)}</p>
+            <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-zinc-800">
+              <p className="text-[12.5px] font-semibold text-zinc-100">{ruleTypeLabel(editingRule.type)}</p>
               <button
                 onClick={() => setEditingRule(null)}
-                className="text-zinc-500 hover:text-zinc-200 transition-colors"
+                className="p-1 -mr-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
-            <div className="px-4 py-4">
+            <div className="px-3.5 py-3.5">
               <RuleEditor rule={editingRule} onChange={updateRule} />
             </div>
           </div>
@@ -441,7 +472,6 @@ export default function Settings({ auth, onBack, onLogout }: Props) {
     });
   }, []);
 
-  // Auto-save with a short debounce so sliders don't hammer the store
   useEffect(() => {
     if (!isLoaded.current) {
       isLoaded.current = true;
@@ -455,6 +485,13 @@ export default function Settings({ auth, onBack, onLogout }: Props) {
 
   const update = (patch: Partial<SettingsType>) =>
     setSettings((s) => ({ ...s, ...patch }));
+
+  const updateNtfyField = (patch: Partial<SettingsType>) => {
+    update(patch);
+    // Clear stale test status whenever the server/topic changes
+    setNtfyTestError(null);
+    setNtfyTestOk(false);
+  };
 
   const testNtfy = async () => {
     setNtfyTesting(true);
@@ -488,24 +525,24 @@ export default function Settings({ auth, onBack, onLogout }: Props) {
       {/* Topbar */}
       <div
         data-tauri-drag-region
-        className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-800/60 select-none shrink-0"
+        className="flex items-center justify-between px-3.5 py-2.5 border-b border-zinc-800/60 select-none shrink-0 bg-gradient-to-b from-[#141414] to-[#101010]"
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <button
             onClick={onBack}
-            className="p-1 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+            className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800/80 transition-colors"
+            title="Back"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-[15px] h-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <span className="text-sm font-medium text-zinc-200 pointer-events-none">Settings</span>
+          <span className="text-[13px] font-semibold text-zinc-200 pointer-events-none tracking-tight">Settings</span>
         </div>
         <WindowControls />
       </div>
 
-      <div className="flex-1 overflow-y-auto overscroll-y-none px-4 py-4 space-y-3">
-        {/* General */}
+      <div className="flex-1 overflow-y-auto overscroll-y-none px-3.5 py-3.5 space-y-4">
         <Section title="General">
           <Toggle label="Launch at startup"
             value={settings.launch_at_startup}
@@ -515,19 +552,17 @@ export default function Settings({ auth, onBack, onLogout }: Props) {
             onChange={(v) => update({ minimize_to_tray: v })} />
         </Section>
 
-        {/* Display */}
         <Section title="Display">
           <Toggle
-            label="Always show precise timestamp"
-            description="Shows exact time (e.g. 'Updated at 11:47:59 pm') instead of relative"
+            label="Precise timestamp"
+            description="Show exact time instead of relative"
             value={settings.precise_timestamp}
             onChange={(v) => update({ precise_timestamp: v })} />
         </Section>
 
-        {/* Notifications */}
         <Section title="Notifications">
           <Toggle
-            label="Enable desktop notifications"
+            label="Desktop notifications"
             value={settings.notifications_enabled}
             onChange={(v) => update({ notifications_enabled: v })} />
           {settings.notifications_enabled && (
@@ -537,7 +572,6 @@ export default function Settings({ auth, onBack, onLogout }: Props) {
           )}
         </Section>
 
-        {/* ntfy */}
         <Section title="ntfy">
           <Toggle label="Enable ntfy"
             value={settings.ntfy_enabled}
@@ -545,26 +579,30 @@ export default function Settings({ auth, onBack, onLogout }: Props) {
           {settings.ntfy_enabled && (
             <>
               <Field label="Server" value={settings.ntfy_server} placeholder="https://ntfy.sh"
-                onChange={(v) => update({ ntfy_server: v })} />
+                onChange={(v) => updateNtfyField({ ntfy_server: v })} />
               <Field label="Topic" value={settings.ntfy_topic} placeholder="claudeometer"
-                onChange={(v) => update({ ntfy_topic: v })} />
+                onChange={(v) => updateNtfyField({ ntfy_topic: v })} />
               <div className="flex items-center justify-between gap-3">
-                <p className="text-xs text-zinc-500 shrink-0">Test connection</p>
+                <p className="text-[11.5px] text-zinc-500">Test connection</p>
                 <button
                   onClick={testNtfy}
                   disabled={ntfyTesting || !settings.ntfy_server || !settings.ntfy_topic}
-                  className="text-xs px-3 py-1.5 rounded-md bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                  className={`text-[11.5px] px-2.5 py-1 rounded-md border transition-colors disabled:opacity-40 disabled:pointer-events-none ${
+                    ntfyTestOk
+                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                      : "bg-zinc-800 border-zinc-700 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-700"
+                  }`}
                 >
                   {ntfyTesting ? "Sending…" : ntfyTestOk ? "Sent ✓" : "Send test"}
                 </button>
               </div>
               {ntfyTestError && (
-                <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+                <p className="text-[11.5px] text-red-400 bg-red-500/8 border border-red-500/20 rounded-md px-2.5 py-1.5 leading-relaxed">
                   {ntfyTestError}
                 </p>
               )}
               <div className="space-y-1.5">
-                <p className="text-xs text-zinc-500">Rules</p>
+                <p className="text-[11px] text-zinc-500 font-medium">Rules</p>
                 <RuleList
                   rules={settings.ntfy_rules}
                   onChange={(rules) => update({ ntfy_rules: rules })} />
@@ -573,27 +611,26 @@ export default function Settings({ auth, onBack, onLogout }: Props) {
           )}
         </Section>
 
-        {/* Sync */}
         <Section title="Sync">
           <div className="space-y-1.5">
-            <p className="text-xs text-zinc-500">Automatic poll interval</p>
-            <div className="flex gap-2">
+            <p className="text-[11px] text-zinc-500 font-medium">Poll interval</p>
+            <div className="flex gap-1 p-0.5 rounded-md bg-zinc-950/60 border border-zinc-800">
               <button
                 onClick={() => update({ auto_poll: false })}
-                className={`flex-1 text-xs py-1.5 rounded-md border transition-colors ${
+                className={`flex-1 text-[11.5px] py-1 rounded transition-all ${
                   !settings.auto_poll
-                    ? "bg-amber-600/10 border-amber-600/40 text-amber-500"
-                    : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-zinc-200"
+                    ? "bg-zinc-800 text-zinc-100 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]"
+                    : "text-zinc-500 hover:text-zinc-300"
                 }`}
               >Off</button>
               {INTERVALS.map((i) => (
                 <button
                   key={i.value}
                   onClick={() => update({ poll_interval_secs: i.value, auto_poll: true })}
-                  className={`flex-1 text-xs py-1.5 rounded-md border transition-colors ${
+                  className={`flex-1 text-[11.5px] py-1 rounded transition-all ${
                     settings.auto_poll && settings.poll_interval_secs === i.value
-                      ? "bg-amber-600/10 border-amber-600/40 text-amber-500"
-                      : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-zinc-200"
+                      ? "bg-zinc-800 text-zinc-100 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]"
+                      : "text-zinc-500 hover:text-zinc-300"
                   }`}
                 >{i.label}</button>
               ))}
@@ -601,36 +638,43 @@ export default function Settings({ auth, onBack, onLogout }: Props) {
           </div>
           <Toggle
             label="Refresh on focus"
-            description="Fetch new data when the app window gains focus"
+            description="Fetch when the window gains focus"
             value={settings.foreground_poll}
             onChange={(v) => update({ foreground_poll: v })} />
         </Section>
 
-        {/* Account */}
         <Section title="Account">
-          <div className="space-y-0.5">
-            {auth.name && <p className="text-sm font-medium text-zinc-200">{auth.name}</p>}
-            {auth.email ? (
-              <p className={auth.name ? "text-xs text-zinc-500" : "text-sm text-zinc-300"}>
-                {auth.email}
-              </p>
-            ) : (
-              !auth.name && (
-                <p className="text-sm text-zinc-400">
-                  {auth.mode === "api_key" ? "API Key" : "Session key"}
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500/30 to-amber-600/10 border border-amber-600/20 flex items-center justify-center shrink-0">
+              <span className="text-[12px] font-semibold text-amber-400">
+                {(auth.name || auth.email || "?").charAt(0).toUpperCase()}
+              </span>
+            </div>
+            <div className="min-w-0 flex-1">
+              {auth.name && <p className="text-[13px] text-zinc-200 truncate">{auth.name}</p>}
+              {auth.email ? (
+                <p className={`${auth.name ? "text-[11.5px] text-zinc-500" : "text-[13px] text-zinc-300"} truncate`}>
+                  {auth.email}
                 </p>
-              )
-            )}
+              ) : (
+                !auth.name && (
+                  <p className="text-[13px] text-zinc-400">
+                    {auth.mode === "api_key" ? "API Key" : "Session key"}
+                  </p>
+                )
+              )}
+            </div>
           </div>
           <button
             onClick={onLogout}
-            className="w-full text-sm text-red-400 hover:text-red-300 bg-red-500/5 hover:bg-red-500/10 border border-red-500/20 rounded-lg py-2 transition-colors"
+            className="w-full text-[12.5px] text-red-400 hover:text-red-300 bg-red-500/8 hover:bg-red-500/12 border border-red-500/20 rounded-md py-1.5 transition-colors"
           >
             Sign out
           </button>
         </Section>
-      </div>
 
+        <div className="h-2" />
+      </div>
     </div>
   );
 }

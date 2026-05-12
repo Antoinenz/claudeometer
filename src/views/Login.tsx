@@ -36,33 +36,32 @@ export default function Login({ onLogin }: Props) {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Drag region */}
       <div
         data-tauri-drag-region
-        className="flex items-center justify-end px-3 py-2 select-none"
+        className="flex items-center justify-end px-3 py-2 select-none shrink-0"
       >
         <WindowControls />
       </div>
 
-      <div className="flex-1 flex flex-col px-6 pb-8 overflow-y-auto">
+      <div className="flex-1 flex flex-col px-6 pb-7 overflow-y-auto overscroll-y-none">
         {/* Header */}
-        <div className="text-center mb-7">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-amber-600/10 border border-amber-600/20 mb-4">
-            <span className="text-2xl text-amber-500">⊙</span>
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center justify-center w-12 h-12 mb-3.5">
+            <img src="/icon.png" alt="" className="w-12 h-12 rounded-xl shadow-lg" draggable={false} />
           </div>
-          <h1 className="text-xl font-semibold text-zinc-100">Claudeometer</h1>
-          <p className="text-sm text-zinc-500 mt-1">Monitor your Claude usage limits</p>
+          <h1 className="text-[17px] font-semibold text-zinc-100 tracking-tight">Claudeometer</h1>
+          <p className="text-[12.5px] text-zinc-500 mt-0.5">Monitor your Claude usage limits</p>
         </div>
 
         {/* Mode tabs */}
-        <div className="flex rounded-lg bg-zinc-900 border border-zinc-800 p-1 mb-5 gap-1">
+        <div className="flex rounded-lg bg-zinc-900/80 border border-zinc-800 p-0.5 mb-4 gap-0.5">
           {(["session", "api"] as Mode[]).map((m) => (
             <button
               key={m}
               onClick={() => { setMode(m); setError(null); setKey(""); }}
-              className={`flex-1 text-sm py-1.5 rounded-md transition-colors ${
+              className={`flex-1 text-[12.5px] py-1.5 rounded-md transition-all ${
                 mode === m
-                  ? "bg-zinc-700 text-zinc-100 shadow-sm"
+                  ? "bg-zinc-800 text-zinc-100 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]"
                   : "text-zinc-500 hover:text-zinc-300"
               }`}
             >
@@ -73,47 +72,47 @@ export default function Login({ onLogin }: Props) {
 
         {/* Instructions */}
         {mode === "session" ? (
-          <div className="space-y-3 mb-5">
-            <p className="text-xs text-zinc-500 leading-relaxed">
-              Paste your <code className="text-amber-500 bg-zinc-900 px-1 rounded">sessionKey</code> cookie
-              from Claude.ai. It stays local and is only used to query your usage.
+          <div className="space-y-3 mb-4">
+            <p className="text-[12px] text-zinc-500 leading-relaxed">
+              Paste your <code className="text-amber-500 bg-amber-500/10 px-1 rounded text-[11px] font-mono">sessionKey</code> cookie
+              from Claude.ai. It stays on your device and is only used to fetch your usage.
             </p>
-            <div className="rounded-lg bg-zinc-900 border border-zinc-800 divide-y divide-zinc-800/60">
+            <ol className="rounded-lg bg-zinc-900/70 border border-zinc-800 divide-y divide-zinc-800/80 overflow-hidden">
               {[
-                <>Open <button onClick={() => openUrl("https://claude.ai")} className="text-amber-500 hover:underline">claude.ai</button> and sign in</>,
-                "Open DevTools → Application → Cookies",
-                <>Copy the value of <code className="text-amber-500">sessionKey</code></>,
+                <>Open <button onClick={() => openUrl("https://claude.ai")} className="text-amber-500 hover:text-amber-400 underline-offset-2 hover:underline">claude.ai</button> and sign in</>,
+                <>Open <span className="text-zinc-300">DevTools → Application → Cookies</span></>,
+                <>Copy the value of <code className="text-amber-500 text-[11px] font-mono">sessionKey</code></>,
               ].map((step, i) => (
-                <div key={i} className="flex items-start gap-3 px-3 py-2.5">
-                  <span className="text-xs text-zinc-600 font-mono mt-px tabular-nums">{i + 1}</span>
-                  <span className="text-xs text-zinc-400">{step}</span>
-                </div>
+                <li key={i} className="flex items-start gap-2.5 px-3 py-2">
+                  <span className="text-[10px] text-zinc-600 font-mono mt-[3px] tabular-nums w-3 text-right">{i + 1}</span>
+                  <span className="text-[12px] text-zinc-400 leading-relaxed">{step}</span>
+                </li>
               ))}
-            </div>
+            </ol>
           </div>
         ) : (
-          <div className="mb-5">
-            <p className="text-xs text-zinc-500 leading-relaxed">
-              Enter your Anthropic API key. Usage limits aren't available via API — use a
-              Claude.ai session key for full limit tracking.
+          <div className="mb-4">
+            <p className="text-[12px] text-zinc-500 leading-relaxed">
+              Enter your Anthropic API key. Usage limits aren't available via API —
+              use a Claude.ai session key for full limit tracking.
             </p>
           </div>
         )}
 
         {/* Key input + connect */}
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           <input
             type="password"
             value={key}
             onChange={(e) => setKey(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleConnect()}
             placeholder={mode === "session" ? "sk-ant-sid01-..." : "sk-ant-api03-..."}
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-600/50 font-mono"
+            className="w-full bg-zinc-900/70 border border-zinc-800 rounded-lg px-3 py-2 text-[12.5px] text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-600/50 focus:bg-zinc-900 font-mono transition-colors"
             autoFocus
           />
 
           {error && (
-            <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+            <p className="text-[11.5px] text-red-400 bg-red-500/8 border border-red-500/20 rounded-lg px-3 py-2 leading-relaxed">
               {error}
             </p>
           )}
@@ -121,7 +120,7 @@ export default function Login({ onLogin }: Props) {
           <button
             onClick={handleConnect}
             disabled={loading || !key.trim()}
-            className="w-full bg-amber-600 hover:bg-amber-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
+            className="w-full bg-amber-600 hover:bg-amber-500 active:bg-amber-700 disabled:bg-zinc-800 disabled:text-zinc-600 text-white text-[13px] font-medium py-2 rounded-lg transition-colors shadow-[0_1px_0_rgba(255,255,255,0.08)_inset]"
           >
             {loading ? "Connecting…" : "Connect"}
           </button>

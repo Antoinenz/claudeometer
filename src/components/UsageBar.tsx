@@ -21,21 +21,30 @@ function formatResetsAt(ts: string | null): string | null {
   }
 }
 
-const GRADIENTS = {
-  red:    "linear-gradient(90deg, #dc2626 0%, #f87171 100%)",
-  orange: "linear-gradient(90deg, #ea580c 0%, #fb923c 100%)",
-  amber:  "linear-gradient(90deg, #d97706 0%, #fbbf24 100%)",
-  green:  "linear-gradient(90deg, #059669 0%, #34d399 100%)",
+const TIERS = {
+  red: {
+    bar:   "linear-gradient(90deg, #dc2626 0%, #f87171 100%)",
+    text:  "text-red-400",
+    dot:   "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]",
+  },
+  orange: {
+    bar:   "linear-gradient(90deg, #ea580c 0%, #fb923c 100%)",
+    text:  "text-orange-400",
+    dot:   "bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)]",
+  },
+  amber: {
+    bar:   "linear-gradient(90deg, #d97706 0%, #fbbf24 100%)",
+    text:  "text-amber-400",
+    dot:   "bg-amber-500",
+  },
+  green: {
+    bar:   "linear-gradient(90deg, #059669 0%, #34d399 100%)",
+    text:  "text-emerald-400",
+    dot:   "bg-emerald-500",
+  },
 } as const;
 
-const TEXT_COLORS = {
-  red:    "text-red-400",
-  orange: "text-orange-400",
-  amber:  "text-amber-400",
-  green:  "text-emerald-400",
-} as const;
-
-type Tier = keyof typeof GRADIENTS;
+type Tier = keyof typeof TIERS;
 
 function tier(pct: number): Tier {
   if (pct >= 90) return "red";
@@ -47,28 +56,36 @@ function tier(pct: number): Tier {
 export default function UsageBar({ label, utilization, resetsAt }: UsageBarProps) {
   const pct = Math.min(Math.max(utilization, 0), 100);
   const t = tier(pct);
+  const colors = TIERS[t];
   const resets = formatResetsAt(resetsAt);
 
   return (
-    <div className="rounded-xl bg-zinc-900 border border-zinc-800 px-4 py-4 space-y-3">
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">{label}</span>
+    <div className="rounded-xl bg-zinc-900/70 border border-zinc-800/80 px-4 py-3.5 space-y-2.5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0 pt-[3px]">
+          <span className={`w-1.5 h-1.5 rounded-full ${colors.dot}`} />
+          <span className="text-[13px] font-medium text-zinc-300 truncate">{label}</span>
+          {resets && (
+            <span className="text-[11px] text-zinc-600 font-mono tabular-nums truncate">
+              · {resets}
+            </span>
+          )}
+        </div>
         <span
-          className={`text-3xl font-bold tabular-nums leading-none ${TEXT_COLORS[t]}`}
-          style={{ fontFamily: "'Space Mono', monospace" }}
+          className={`text-[28px] font-medium tabular-nums leading-none ${colors.text}`}
+          style={{ fontFamily: "'JetBrains Mono', monospace", letterSpacing: "-0.04em" }}
         >
-          {Math.round(pct)}<span className="text-lg font-semibold">%</span>
+          {Math.round(pct)}<span className="text-base text-zinc-600 ml-0.5">%</span>
         </span>
       </div>
-      <div className="h-3 w-full rounded-full bg-zinc-800 overflow-hidden">
+      <div className="relative h-[7px] w-full rounded-full bg-zinc-800/80 overflow-hidden shadow-[inset_0_1px_1px_rgba(0,0,0,0.4)]">
         <div
-          className="h-full rounded-full transition-all duration-700 ease-out"
-          style={{ width: `${pct}%`, background: GRADIENTS[t] }}
-        />
+          className="bar-fill relative h-full rounded-full transition-[width] duration-700 ease-out"
+          style={{ width: `${pct}%`, background: colors.bar }}
+        >
+          <span className="bar-shine" />
+        </div>
       </div>
-      {resets && (
-        <p className="text-xs text-zinc-500 text-right">resets in {resets}</p>
-      )}
     </div>
   );
 }

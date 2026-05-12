@@ -13,8 +13,8 @@ export default {
         accent: "#d97706",
       },
       fontFamily: {
-        sans: ["-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
-        mono: ["SF Mono", "Consolas", "monospace"],
+        sans: ["Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
+        mono: ["JetBrains Mono", "SF Mono", "Consolas", "monospace"],
       },
     },
   },

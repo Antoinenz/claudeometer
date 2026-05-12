@@ -161,14 +161,14 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#111111] border border-zinc-800/80">
-        <div className="h-4 w-4 rounded-full bg-amber-600 animate-pulse" />
+      <div className="flex h-screen items-center justify-center bg-[#0d0d0d] border border-zinc-800/80">
+        <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
       </div>
     );
   }
 
   return (
-    <div className="h-screen bg-[#111111] flex flex-col border border-zinc-800/80 overflow-hidden">
+    <div className="h-screen bg-[#0d0d0d] flex flex-col border border-zinc-800/80 overflow-hidden">
       {view === "login" && <Login onLogin={handleLogin} />}
       {view === "dashboard" && (
         <Dashboard
