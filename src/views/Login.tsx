@@ -63,7 +63,7 @@ export default function Login({ onLogin, onBack }: Props) {
     <div className="flex flex-col h-full">
       <div
         data-tauri-drag-region
-        className="flex items-center justify-end px-3 py-2 select-none shrink-0"
+        className="flex items-center justify-end h-[48px] px-3.5 border-b border-transparent select-none shrink-0"
       >
         <WindowControls />
       </div>

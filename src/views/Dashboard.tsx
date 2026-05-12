@@ -129,7 +129,7 @@ export default function Dashboard({ usage, error, isRefreshing, cooldownEndsAt, 
       {/* Topbar */}
       <div
         data-tauri-drag-region
-        className="flex items-center justify-between px-3.5 py-2.5 border-b border-zinc-800/60 select-none shrink-0 bg-gradient-to-b from-[#141414] to-[#101010]"
+        className="flex items-center justify-between h-[48px] px-3.5 border-b border-zinc-800/60 select-none shrink-0 bg-gradient-to-b from-[#141414] to-[#101010]"
       >
         <div className="flex items-center gap-2 pointer-events-none">
           <img src="/icon.png" alt="" className="w-[18px] h-[18px] rounded" draggable={false} />
