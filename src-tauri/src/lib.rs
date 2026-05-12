@@ -125,6 +125,16 @@ async fn poll_once(app: &AppHandle) {
         Err(_) => return,
     };
 
+    let auto_poll = store
+        .get("settings")
+        .and_then(|v| v.get("auto_poll").cloned())
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
+
+    if !auto_poll {
+        return;
+    }
+
     let mode = store
         .get("auth_mode")
         .and_then(|v| v.as_str().map(str::to_string))

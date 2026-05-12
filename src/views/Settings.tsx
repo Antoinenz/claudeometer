@@ -224,6 +224,18 @@ export default function Settings({ auth, onBack, onLogout }: Props) {
               ))}
             </div>
           </div>
+          <Toggle
+            label="Automatic polling"
+            description="Fetch usage on a background timer"
+            value={settings.auto_poll}
+            onChange={(v) => update({ auto_poll: v })}
+          />
+          <Toggle
+            label="Refresh on focus"
+            description="Fetch new data when the app window gains focus"
+            value={settings.foreground_poll}
+            onChange={(v) => update({ foreground_poll: v })}
+          />
         </Section>
 
         <Section title="Account">

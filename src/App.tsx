@@ -9,6 +9,8 @@ import Settings_ from "./views/Settings";
 
 type View = "login" | "dashboard" | "settings";
 
+const COOLDOWN_MS = 20_000;
+
 export default function App() {
   const [view, setView] = useState<View>("login");
   const [auth, setAuth] = useState<AuthState>({ mode: "none", email: null, name: null });
@@ -16,11 +18,20 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [refreshCooldown, setRefreshCooldown] = useState(false);
+  const [cooldownEndsAt, setCooldownEndsAt] = useState<number | null>(null);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+
   const refreshingRef = useRef(false);
   const cooldownUntilRef = useRef<number>(0);
   const cooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Refs so doRefresh and the focus handler always see the current value without stale closures
+  const errorRef = useRef<string | null>(null);
+  const foregroundPollRef = useRef<boolean>(true);
+
+  const updateError = (e: string | null) => {
+    errorRef.current = e;
+    setError(e);
+  };
 
   useEffect(() => {
     invoke<AuthState>("get_auth_state").then((state) => {
@@ -28,23 +39,39 @@ export default function App() {
       setView(state.mode === "none" ? "login" : "dashboard");
       setLoading(false);
     });
-    invoke<Settings>("get_settings").then(setSettings).catch(() => {});
+    invoke<Settings>("get_settings").then((s) => {
+      setSettings(s);
+      foregroundPollRef.current = s.foreground_poll ?? true;
+    }).catch(() => {});
   }, []);
+
+  // Keep foregroundPollRef in sync when settings change
+  useEffect(() => {
+    foregroundPollRef.current = settings.foreground_poll ?? true;
+  }, [settings.foreground_poll]);
 
   // Background-poll events
   useEffect(() => {
     const unlistenUsage = listen<UsageData>("usage-updated", (e) => {
       setUsage(e.payload);
-      setError(null);
+      updateError(null);
+      // Keep auth name/email current from API response
+      if (e.payload.name || e.payload.email) {
+        setAuth((prev) => ({
+          ...prev,
+          name: e.payload.name ?? prev.name,
+          email: e.payload.email ?? prev.email,
+        }));
+      }
     });
     const unlistenError = listen<string>("usage-error", (e) => {
-      setError(e.payload);
+      updateError(e.payload);
     });
     return () => {
       unlistenUsage.then((f) => f());
       unlistenError.then((f) => f());
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-refresh when the window comes into focus
   useEffect(() => {
@@ -52,7 +79,7 @@ export default function App() {
     let cleanup: (() => void) | undefined;
     getCurrentWindow()
       .onFocusChanged(({ payload: focused }) => {
-        if (focused && !refreshingRef.current) {
+        if (focused && !refreshingRef.current && foregroundPollRef.current) {
           doRefresh();
         }
       })
@@ -60,29 +87,41 @@ export default function App() {
     return () => cleanup?.();
   }, [auth.mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const COOLDOWN_MS = 20_000;
-
   const doRefresh = async () => {
     if (refreshingRef.current) return;
-    if (Date.now() < cooldownUntilRef.current) return;
+    // Cooldown is bypassed when there is a current error so the user can retry immediately
+    if (!errorRef.current && Date.now() < cooldownUntilRef.current) return;
+
     refreshingRef.current = true;
     setIsRefreshing(true);
     try {
       const d = await invoke<UsageData>("fetch_usage");
       setUsage(d);
-      setError(null);
+      updateError(null);
+      // Keep auth name/email current from the API response
+      if (d.name || d.email) {
+        setAuth((prev) => ({
+          ...prev,
+          name: d.name ?? prev.name,
+          email: d.email ?? prev.email,
+        }));
+      }
     } catch (e) {
-      setError(String(e));
+      updateError(String(e));
     } finally {
       setIsRefreshing(false);
       refreshingRef.current = false;
-      if (cooldownTimerRef.current) clearTimeout(cooldownTimerRef.current);
-      cooldownUntilRef.current = Date.now() + COOLDOWN_MS;
-      setRefreshCooldown(true);
-      cooldownTimerRef.current = setTimeout(() => {
-        setRefreshCooldown(false);
-        cooldownUntilRef.current = 0;
-      }, COOLDOWN_MS);
+      // Only apply cooldown after a successful fetch (not after errors, so retries are fast)
+      if (!errorRef.current) {
+        if (cooldownTimerRef.current) clearTimeout(cooldownTimerRef.current);
+        const endsAt = Date.now() + COOLDOWN_MS;
+        cooldownUntilRef.current = endsAt;
+        setCooldownEndsAt(endsAt);
+        cooldownTimerRef.current = setTimeout(() => {
+          cooldownUntilRef.current = 0;
+          setCooldownEndsAt(null);
+        }, COOLDOWN_MS);
+      }
     }
   };
 
@@ -96,13 +135,15 @@ export default function App() {
     await invoke("logout");
     setAuth({ mode: "none", email: null, name: null });
     setUsage(null);
-    setError(null);
+    updateError(null);
     setView("login");
   };
 
   const handleBackFromSettings = () => {
-    // Re-fetch settings in case they changed
-    invoke<Settings>("get_settings").then(setSettings).catch(() => {});
+    invoke<Settings>("get_settings").then((s) => {
+      setSettings(s);
+      foregroundPollRef.current = s.foreground_poll ?? true;
+    }).catch(() => {});
     setView("dashboard");
   };
 
@@ -122,7 +163,7 @@ export default function App() {
           usage={usage}
           error={error}
           isRefreshing={isRefreshing}
-          isRefreshDisabled={isRefreshing || refreshCooldown}
+          cooldownEndsAt={cooldownEndsAt}
           preciseTimestamp={settings.precise_timestamp}
           onSettings={() => setView("settings")}
           onRefresh={doRefresh}

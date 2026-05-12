@@ -7,7 +7,7 @@ interface Props {
   usage: UsageData | null;
   error: string | null;
   isRefreshing: boolean;
-  isRefreshDisabled: boolean;
+  cooldownEndsAt: number | null;
   preciseTimestamp: boolean;
   onSettings: () => void;
   onRefresh: () => void;
@@ -15,7 +15,7 @@ interface Props {
 
 function classifyError(err: string): string {
   const lower = err.toLowerCase();
-  if (lower.includes("network") || lower.includes("dns") || lower.includes("offline") || lower.includes("internet") || lower.includes("connect")) {
+  if (lower.includes("network") || lower.includes("dns") || lower.includes("offline") || lower.includes("internet")) {
     return "Not connected to internet";
   }
   if (lower.includes("401") || lower.includes("403") || lower.includes("unauthorized") || lower.includes("session") || lower.includes("expired") || lower.includes("forbidden")) {
@@ -57,13 +57,28 @@ function formatTimestamp(ts: string, precise: boolean): string {
   }
 }
 
-export default function Dashboard({ usage, error, isRefreshing, isRefreshDisabled, preciseTimestamp, onSettings, onRefresh }: Props) {
+export default function Dashboard({ usage, error, isRefreshing, cooldownEndsAt, preciseTimestamp, onSettings, onRefresh }: Props) {
   // Ticker so relative timestamps update automatically
   const [, setTick] = useState(0);
   useEffect(() => {
     const id = setInterval(() => setTick((n) => n + 1), 20_000);
     return () => clearInterval(id);
   }, []);
+
+  // 1-second ticker for the cooldown countdown badge
+  const [, setCooldownTick] = useState(0);
+  useEffect(() => {
+    if (!cooldownEndsAt) return;
+    const id = setInterval(() => setCooldownTick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [cooldownEndsAt]);
+
+  // Cooldown only blocks the button when there's no error (errors bypass rate limiting)
+  const secsLeft = cooldownEndsAt && !error
+    ? Math.max(0, Math.ceil((cooldownEndsAt - Date.now()) / 1000))
+    : 0;
+  const inCooldown = secsLeft > 0;
+  const isRefreshDisabled = isRefreshing || inCooldown;
 
   return (
     <div className="flex flex-col h-full">
@@ -81,18 +96,27 @@ export default function Dashboard({ usage, error, isRefreshing, isRefreshDisable
             onClick={onRefresh}
             title="Refresh"
             disabled={isRefreshDisabled}
-            className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors disabled:opacity-40"
+            className={`relative p-1.5 rounded-md text-zinc-500 transition-colors disabled:opacity-40 ${
+              inCooldown ? "cursor-default" : "hover:text-zinc-300 hover:bg-zinc-800"
+            }`}
           >
-            <svg
-              className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`}
-              style={isRefreshing ? { animationDirection: "reverse" } : undefined}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
+            <div className="relative">
+              <svg
+                className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`}
+                style={isRefreshing ? { animationDirection: "reverse" } : undefined}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {inCooldown && (
+                <span className="absolute -bottom-1 -right-1.5 text-[7px] font-mono leading-none text-zinc-500 bg-[#111111] px-[1px]">
+                  {secsLeft}
+                </span>
+              )}
+            </div>
           </button>
           <button
             onClick={onSettings}
@@ -167,8 +191,8 @@ export default function Dashboard({ usage, error, isRefreshing, isRefreshDisable
         )}
       </div>
 
-      {/* Footer */}
-      {usage && (
+      {/* Footer — hidden when there is an error */}
+      {usage && !error && (
         <div className="shrink-0 px-4 py-2.5 border-t border-zinc-800/60">
           <p className="text-xs text-zinc-600 text-center">
             {formatTimestamp(usage.fetched_at, preciseTimestamp)}

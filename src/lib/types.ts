@@ -30,6 +30,8 @@ export interface Settings {
   ntfy_server: string;
   ntfy_topic: string;
   precise_timestamp: boolean;
+  auto_poll: boolean;
+  foreground_poll: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -42,4 +44,6 @@ export const DEFAULT_SETTINGS: Settings = {
   ntfy_server: "https://ntfy.sh",
   ntfy_topic: "claudeometer",
   precise_timestamp: false,
+  auto_poll: true,
+  foreground_poll: true,
 };

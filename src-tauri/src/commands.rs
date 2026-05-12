@@ -22,6 +22,8 @@ pub struct Settings {
     pub ntfy_server: String,
     pub ntfy_topic: String,
     pub precise_timestamp: bool,
+    pub auto_poll: bool,
+    pub foreground_poll: bool,
 }
 
 impl Default for Settings {
@@ -36,6 +38,8 @@ impl Default for Settings {
             ntfy_server: "https://ntfy.sh".to_string(),
             ntfy_topic: "claudeometer".to_string(),
             precise_timestamp: false,
+            auto_poll: true,
+            foreground_poll: true,
         }
     }
 }
@@ -112,7 +116,7 @@ pub async fn fetch_usage(app: AppHandle) -> Result<UsageData, String> {
         .and_then(|v| v.as_str().map(str::to_string))
         .unwrap_or_default();
 
-    match mode.as_str() {
+    let result = match mode.as_str() {
         "session_key" => {
             let key = store
                 .get("session_key")
@@ -128,7 +132,19 @@ pub async fn fetch_usage(app: AppHandle) -> Result<UsageData, String> {
             verify_api_key(&key).await
         }
         _ => Err("Not authenticated".to_string()),
+    };
+
+    if let Ok(ref data) = result {
+        if let Some(ref name) = data.name {
+            store.set("name", serde_json::Value::String(name.clone()));
+        }
+        if let Some(ref email) = data.email {
+            store.set("email", serde_json::Value::String(email.clone()));
+        }
+        let _ = store.save();
     }
+
+    result
 }
 
 #[tauri::command]
