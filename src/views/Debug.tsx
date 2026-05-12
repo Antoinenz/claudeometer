@@ -132,11 +132,6 @@ export default function Debug({ isFocused, settings, onBack, onSimulate, onShowL
           <span className={`text-[13px] font-semibold pointer-events-none tracking-tight transition-colors duration-200 ${isFocused ? "text-zinc-200" : "text-zinc-500"}`}>
             Debug
           </span>
-          {isDev && (
-            <span className="text-[9px] font-mono px-1 py-px rounded bg-amber-600/20 text-amber-500 border border-amber-600/30">
-              DEV
-            </span>
-          )}
         </div>
         <WindowControls isFocused={isFocused} />
       </div>
@@ -148,14 +143,14 @@ export default function Debug({ isFocused, settings, onBack, onSimulate, onShowL
           <p className="text-[11.5px] text-zinc-500 -mt-1 leading-relaxed">
             Switches to a view with mock data. Exit via the banner at the bottom of the dashboard.
           </p>
-          <button
-            onClick={onShowLogin}
-            className="w-full text-left px-2.5 py-2 rounded-md bg-zinc-950/60 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/60 transition-colors"
-          >
-            <p className="text-[11.5px] text-zinc-300">Login screen</p>
-            <p className="text-[10px] text-zinc-600 mt-0.5">Navigate to login view</p>
-          </button>
           <div className="grid grid-cols-2 gap-1.5">
+            <button
+              onClick={onShowLogin}
+              className="text-left px-2.5 py-2 rounded-md bg-zinc-950/60 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/60 transition-colors"
+            >
+              <p className="text-[11.5px] text-zinc-300">Login screen</p>
+              <p className="text-[10px] text-zinc-600 mt-0.5">Navigate to login view</p>
+            </button>
             {SIMULATIONS.map((s) => (
               <button
                 key={s.label}
