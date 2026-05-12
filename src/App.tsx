@@ -6,14 +6,16 @@ import { AuthState, Settings, UsageData, DEFAULT_SETTINGS } from "./lib/types";
 import Login from "./views/Login";
 import Dashboard from "./views/Dashboard";
 import Settings_ from "./views/Settings";
+import Debug from "./views/Debug";
 
-type View = "login" | "dashboard" | "settings";
+type View = "login" | "dashboard" | "settings" | "debug";
 
 const COOLDOWN_MS = 20_000;
 
 export default function App() {
   const [view, setView] = useState<View>("login");
   const [isFocused, setIsFocused] = useState(true);
+  const [simulation, setSimulation] = useState<{ usage: UsageData | null; error: string | null } | null>(null);
   const [auth, setAuth] = useState<AuthState>({ mode: "none", email: null, name: null });
   const [usage, setUsage] = useState<UsageData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -178,19 +180,22 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen bg-[#0d0d0d] flex flex-col border border-zinc-800/80 overflow-hidden">
+    <div className={`h-screen bg-[#0d0d0d] flex flex-col overflow-hidden border transition-colors duration-200 ${isFocused ? "border-zinc-700/50" : "border-zinc-800/40"}`}>
       {view === "login" && <Login onLogin={handleLogin} />}
       {view === "dashboard" && (
         <Dashboard
-          usage={usage}
-          error={error}
+          usage={simulation ? simulation.usage : usage}
+          error={simulation ? simulation.error : error}
           isRefreshing={isRefreshing}
           cooldownEndsAt={cooldownEndsAt}
           preciseTimestamp={settings.precise_timestamp}
           hideCooldownBadge={settings.hide_cooldown_badge}
           isFocused={isFocused}
+          isSimulating={!!simulation}
           onSettings={() => setView("settings")}
           onRefresh={doRefresh}
+          onSignOut={handleLogout}
+          onStopSimulation={() => setSimulation(null)}
         />
       )}
       {view === "settings" && (
@@ -199,6 +204,15 @@ export default function App() {
           isFocused={isFocused}
           onBack={handleBackFromSettings}
           onLogout={handleLogout}
+          onOpenDebug={() => setView("debug")}
+        />
+      )}
+      {view === "debug" && (
+        <Debug
+          isFocused={isFocused}
+          settings={settings}
+          onBack={() => setView("settings")}
+          onSimulate={(usage, error) => { setSimulation({ usage, error }); setView("dashboard"); }}
         />
       )}
     </div>

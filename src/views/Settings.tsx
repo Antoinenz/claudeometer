@@ -11,6 +11,7 @@ interface Props {
   isFocused: boolean;
   onBack: () => void;
   onLogout: () => void;
+  onOpenDebug: () => void;
 }
 
 // ── Primitives ───────────────────────────────────────────────────────────────
@@ -462,13 +463,15 @@ function RuleList({ rules, onChange }: {
 
 // ── Main Settings view ───────────────────────────────────────────────────────
 
-export default function Settings({ auth, isFocused, onBack, onLogout }: Props) {
+export default function Settings({ auth, isFocused, onBack, onLogout, onOpenDebug }: Props) {
   const [settings, setSettings]           = useState<SettingsType>(DEFAULT_SETTINGS);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [ntfyTesting, setNtfyTesting]     = useState(false);
   const [ntfyTestOk, setNtfyTestOk]       = useState(false);
   const [ntfyTestError, setNtfyTestError] = useState<string | null>(null);
   const [appVersion, setAppVersion]       = useState<string | null>(null);
+  const debugTapCount = useRef(0);
+  const debugTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLoaded = useRef(false);
 
   useEffect(() => {
@@ -548,7 +551,7 @@ export default function Settings({ auth, isFocused, onBack, onLogout }: Props) {
           </button>
           <span className={`text-[13px] font-semibold pointer-events-none tracking-tight transition-colors duration-200 ${isFocused ? "text-zinc-200" : "text-zinc-500"}`}>Settings</span>
         </div>
-        <WindowControls />
+        <WindowControls isFocused={isFocused} />
       </div>
 
       <div className={`flex-1 overflow-y-auto overscroll-y-none px-3.5 py-3.5 space-y-4 ${!settingsLoaded ? "[&_*]:!transition-none" : ""}`}>
@@ -683,7 +686,18 @@ export default function Settings({ auth, isFocused, onBack, onLogout }: Props) {
 
         <Section title="About">
           <div className="flex items-center gap-3">
-            <img src="/icon.png" alt="" className="w-9 h-9 rounded-lg shrink-0" draggable={false} />
+            <img
+            src="/icon.png" alt="" className="w-9 h-9 rounded-lg shrink-0" draggable={false}
+            onClick={() => {
+              debugTapCount.current += 1;
+              if (debugTapTimer.current) clearTimeout(debugTapTimer.current);
+              debugTapTimer.current = setTimeout(() => { debugTapCount.current = 0; }, 1500);
+              if (debugTapCount.current >= 5) {
+                debugTapCount.current = 0;
+                onOpenDebug();
+              }
+            }}
+          />
             <div>
               <p className="text-[13px] font-semibold text-zinc-100 tracking-tight">Claudeometer</p>
               <p className="text-[11.5px] text-zinc-500">

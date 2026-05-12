@@ -11,8 +11,11 @@ interface Props {
   preciseTimestamp: boolean;
   hideCooldownBadge: boolean;
   isFocused: boolean;
+  isSimulating: boolean;
   onSettings: () => void;
   onRefresh: () => void;
+  onSignOut: () => void;
+  onStopSimulation: () => void;
 }
 
 type ErrorKind = "offline" | "auth" | "claude" | "unknown";
@@ -90,7 +93,7 @@ function formatTimestamp(ts: string, precise: boolean): string {
   }
 }
 
-export default function Dashboard({ usage, error, isRefreshing, cooldownEndsAt, preciseTimestamp, hideCooldownBadge, isFocused, onSettings, onRefresh }: Props) {
+export default function Dashboard({ usage, error, isRefreshing, cooldownEndsAt, preciseTimestamp, hideCooldownBadge, isFocused, isSimulating, onSettings, onRefresh, onSignOut, onStopSimulation }: Props) {
   // Ticker so relative timestamps update automatically
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -163,7 +166,7 @@ export default function Dashboard({ usage, error, isRefreshing, cooldownEndsAt, 
             </svg>
           </button>
           <div className="w-px h-3.5 bg-zinc-800 mx-1" />
-          <WindowControls />
+          <WindowControls isFocused={isFocused} />
         </div>
       </div>
 
@@ -180,6 +183,14 @@ export default function Dashboard({ usage, error, isRefreshing, cooldownEndsAt, 
                 <p className="text-sm font-medium text-zinc-200">{err.title}</p>
                 <p className="text-xs text-zinc-500 leading-relaxed">{err.hint}</p>
               </div>
+              {err.kind === "auth" && (
+                <button
+                  onClick={onSignOut}
+                  className="text-[12px] px-3 py-1.5 rounded-md bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-700 transition-colors"
+                >
+                  Sign out
+                </button>
+              )}
             </div>
           </div>
         ) : (
@@ -227,14 +238,21 @@ export default function Dashboard({ usage, error, isRefreshing, cooldownEndsAt, 
         )}
       </div>
 
-      {/* Footer */}
-      {usage && !error && (
+      {/* Footer / simulation bar */}
+      {isSimulating ? (
+        <div className="shrink-0 px-4 py-2 border-t border-amber-600/30 bg-amber-600/5 flex items-center justify-between">
+          <p className="text-[10.5px] text-amber-600/80 tracking-tight">Simulating</p>
+          <button onClick={onStopSimulation} className="text-[10.5px] text-amber-600/70 hover:text-amber-500 transition-colors">
+            Exit
+          </button>
+        </div>
+      ) : usage && !error ? (
         <div className="shrink-0 px-4 py-2 border-t border-zinc-800/60 bg-[#0d0d0d]">
           <p className="text-[10.5px] text-zinc-600 text-center tracking-tight">
             {formatTimestamp(usage.fetched_at, preciseTimestamp)}
           </p>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

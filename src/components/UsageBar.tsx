@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 interface UsageBarProps {
   label: string;
   utilization: number;
@@ -54,6 +56,12 @@ function tier(pct: number): Tier {
 }
 
 export default function UsageBar({ label, utilization, resetsAt }: UsageBarProps) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick(n => n + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
   const pct = Math.min(Math.max(utilization, 0), 100);
   const t = tier(pct);
   const colors = TIERS[t];
