@@ -1,6 +1,6 @@
 # Claudeometer
 
-A small desktop app for monitoring your [Claude.ai](https://claude.ai) usage limits in real time.
+A lightweight desktop app for monitoring your [Claude.ai](https://claude.ai) usage limits in real time.
 
 ![Tauri](https://img.shields.io/badge/Tauri_v2-000000?logo=tauri) ![React](https://img.shields.io/badge/React_18-000000?logo=react) ![TypeScript](https://img.shields.io/badge/TypeScript-000000?logo=typescript)
 
