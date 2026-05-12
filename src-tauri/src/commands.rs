@@ -30,6 +30,7 @@ pub enum NotificationRule {
 pub struct Settings {
     pub launch_at_startup: bool,
     pub minimize_to_tray: bool,
+    pub notifications_enabled: bool,
     pub notification_rules: Vec<NotificationRule>,
     pub ntfy_enabled: bool,
     pub ntfy_server: String,
@@ -46,6 +47,7 @@ impl Default for Settings {
         Self {
             launch_at_startup: false,
             minimize_to_tray: true,
+            notifications_enabled: true,
             notification_rules: vec![],
             ntfy_enabled: false,
             ntfy_server: "https://ntfy.sh".to_string(),

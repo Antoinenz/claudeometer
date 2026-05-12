@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { AuthState, NotificationRule, Settings as SettingsType, DEFAULT_SETTINGS } from "../lib/types";
 import WindowControls from "../components/WindowControls";
@@ -9,7 +10,7 @@ interface Props {
   onLogout: () => void;
 }
 
-// ── Small reusable primitives ────────────────────────────────────────────────
+// ── Primitives ───────────────────────────────────────────────────────────────
 
 function Toggle({
   label,
@@ -84,49 +85,47 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-// ── Notification rule helpers ────────────────────────────────────────────────
+// ── Rule helpers ─────────────────────────────────────────────────────────────
 
 const WINDOWS_ALL = [
-  { value: "five_hour", label: "5-hour" },
-  { value: "seven_day", label: "7-day" },
-  { value: "seven_day_sonnet", label: "Sonnet" },
-  { value: "any", label: "Any" },
+  { value: "five_hour",       label: "5-hour"  },
+  { value: "seven_day",       label: "7-day"   },
+  { value: "seven_day_sonnet",label: "Sonnet"  },
+  { value: "any",             label: "Any"     },
 ];
-
 const WINDOWS_SPECIFIC = WINDOWS_ALL.slice(0, 3);
 
 const RESET_OPTIONS = [
-  { value: 15, label: "15m" },
-  { value: 30, label: "30m" },
-  { value: 60, label: "1h" },
-  { value: 120, label: "2h" },
+  { value: 15,  label: "15m" },
+  { value: 30,  label: "30m" },
+  { value: 60,  label: "1h"  },
+  { value: 120, label: "2h"  },
 ];
 
 const RULE_TYPES: { type: NotificationRule["type"]; label: string; description: string }[] = [
   { type: "threshold",  label: "Usage threshold",      description: "Alert when a window reaches a percentage" },
-  { type: "spike",      label: "Usage spike",          description: "Alert when usage jumps between polls" },
-  { type: "reset_soon", label: "Limit resetting soon", description: "Alert before a window resets" },
-  { type: "recovery",   label: "Usage recovery",       description: "Alert when usage drops below a level" },
+  { type: "spike",      label: "Usage spike",          description: "Alert when usage jumps between polls"     },
+  { type: "reset_soon", label: "Limit resetting soon", description: "Alert before a window resets"            },
+  { type: "recovery",   label: "Usage recovery",       description: "Alert when usage drops below a level"    },
 ];
 
+function ruleTypeLabel(type: NotificationRule["type"]): string {
+  return RULE_TYPES.find((r) => r.type === type)?.label ?? type;
+}
+
 function windowLabel(w: string): string {
-  return (
-    { five_hour: "5-hour", seven_day: "7-day", seven_day_sonnet: "Sonnet", any: "any" }[w] ?? w
-  );
+  return { five_hour: "5-hour", seven_day: "7-day", seven_day_sonnet: "Sonnet", any: "any" }[w] ?? w;
 }
 
 function formatRule(rule: NotificationRule): string {
   switch (rule.type) {
-    case "threshold":
-      return `When ${windowLabel(rule.window)} reaches ${rule.at_pct}%`;
-    case "spike":
-      return `When ${windowLabel(rule.window)} spikes by ${rule.by_pct}%`;
+    case "threshold":  return `When ${windowLabel(rule.window)} reaches ${rule.at_pct}%`;
+    case "spike":      return `When ${windowLabel(rule.window)} spikes by ${rule.by_pct}%`;
     case "reset_soon": {
       const m = rule.within_mins;
       return `When ${windowLabel(rule.window)} resets within ${m >= 60 ? `${m / 60}h` : `${m}m`}`;
     }
-    case "recovery":
-      return `When ${windowLabel(rule.window)} drops below ${rule.below_pct}%`;
+    case "recovery":   return `When ${windowLabel(rule.window)} drops below ${rule.below_pct}%`;
   }
 }
 
@@ -142,11 +141,7 @@ function makeDefaultRule(type: NotificationRule["type"]): NotificationRule {
 
 // ── Window pill picker ───────────────────────────────────────────────────────
 
-function WindowPicker({
-  windows,
-  value,
-  onChange,
-}: {
+function WindowPicker({ windows, value, onChange }: {
   windows: { value: string; label: string }[];
   value: string;
   onChange: (v: string) => void;
@@ -170,41 +165,34 @@ function WindowPicker({
   );
 }
 
-// ── Rule parameter editor ────────────────────────────────────────────────────
+// ── Rule parameter editor (used inside the modal) ────────────────────────────
 
-function RuleEditor({ rule, onChange }: { rule: NotificationRule; onChange: (r: NotificationRule) => void }) {
+function RuleEditor({ rule, onChange }: {
+  rule: NotificationRule;
+  onChange: (r: NotificationRule) => void;
+}) {
   return (
-    <div className="rounded-lg bg-zinc-800/40 border border-zinc-700/50 px-3 py-3 space-y-3">
-      {/* Window */}
+    <div className="space-y-4">
       <div className="space-y-1.5">
         <p className="text-[10px] font-medium text-zinc-500 uppercase tracking-wide">Window</p>
         {rule.type === "threshold" || rule.type === "recovery" ? (
-          <WindowPicker
-            windows={WINDOWS_ALL}
-            value={rule.window}
+          <WindowPicker windows={WINDOWS_ALL}     value={rule.window}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            onChange={(v) => onChange({ ...rule, window: v } as any)}
-          />
+            onChange={(v) => onChange({ ...rule, window: v } as any)} />
         ) : (
-          <WindowPicker
-            windows={WINDOWS_SPECIFIC}
-            value={rule.window}
+          <WindowPicker windows={WINDOWS_SPECIFIC} value={rule.window}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            onChange={(v) => onChange({ ...rule, window: v } as any)}
-          />
+            onChange={(v) => onChange({ ...rule, window: v } as any)} />
         )}
       </div>
 
-      {/* Per-type params */}
       {rule.type === "threshold" && (
         <div className="space-y-1.5">
           <p className="text-[10px] font-medium text-zinc-500 uppercase tracking-wide">Alert when above</p>
           <div className="flex items-center gap-3">
-            <input
-              type="range" min={10} max={100} step={5} value={rule.at_pct}
+            <input type="range" min={10} max={100} step={5} value={rule.at_pct}
               onChange={(e) => onChange({ ...rule, at_pct: Number(e.target.value) })}
-              className="flex-1 accent-amber-600"
-            />
+              className="flex-1 accent-amber-600" />
             <span className="text-sm text-zinc-300 tabular-nums w-8 text-right">{rule.at_pct}%</span>
           </div>
         </div>
@@ -214,11 +202,9 @@ function RuleEditor({ rule, onChange }: { rule: NotificationRule; onChange: (r: 
         <div className="space-y-1.5">
           <p className="text-[10px] font-medium text-zinc-500 uppercase tracking-wide">Jump of at least</p>
           <div className="flex items-center gap-3">
-            <input
-              type="range" min={5} max={50} step={5} value={rule.by_pct}
+            <input type="range" min={5} max={50} step={5} value={rule.by_pct}
               onChange={(e) => onChange({ ...rule, by_pct: Number(e.target.value) })}
-              className="flex-1 accent-amber-600"
-            />
+              className="flex-1 accent-amber-600" />
             <span className="text-sm text-zinc-300 tabular-nums w-8 text-right">{rule.by_pct}%</span>
           </div>
           <p className="text-[10px] text-zinc-600">Between consecutive polls</p>
@@ -230,17 +216,13 @@ function RuleEditor({ rule, onChange }: { rule: NotificationRule; onChange: (r: 
           <p className="text-[10px] font-medium text-zinc-500 uppercase tracking-wide">Alert within</p>
           <div className="flex gap-1.5">
             {RESET_OPTIONS.map((o) => (
-              <button
-                key={o.value}
-                onClick={() => onChange({ ...rule, within_mins: o.value })}
+              <button key={o.value} onClick={() => onChange({ ...rule, within_mins: o.value })}
                 className={`flex-1 text-xs py-1 rounded border transition-colors ${
                   rule.within_mins === o.value
                     ? "bg-amber-600/10 border-amber-600/40 text-amber-500"
                     : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-zinc-200"
                 }`}
-              >
-                {o.label}
-              </button>
+              >{o.label}</button>
             ))}
           </div>
         </div>
@@ -250,11 +232,9 @@ function RuleEditor({ rule, onChange }: { rule: NotificationRule; onChange: (r: 
         <div className="space-y-1.5">
           <p className="text-[10px] font-medium text-zinc-500 uppercase tracking-wide">Alert when drops below</p>
           <div className="flex items-center gap-3">
-            <input
-              type="range" min={10} max={90} step={5} value={rule.below_pct}
+            <input type="range" min={10} max={90} step={5} value={rule.below_pct}
               onChange={(e) => onChange({ ...rule, below_pct: Number(e.target.value) })}
-              className="flex-1 accent-amber-600"
-            />
+              className="flex-1 accent-amber-600" />
             <span className="text-sm text-zinc-300 tabular-nums w-8 text-right">{rule.below_pct}%</span>
           </div>
         </div>
@@ -263,37 +243,39 @@ function RuleEditor({ rule, onChange }: { rule: NotificationRule; onChange: (r: 
   );
 }
 
-// ── Mac-style rule list ──────────────────────────────────────────────────────
+// ── Mac-style rule list with portal dropdown + portal modal editor ────────────
 
-function RuleList({
-  rules,
-  onChange,
-}: {
+function RuleList({ rules, onChange }: {
   rules: NotificationRule[];
   onChange: (rules: NotificationRule[]) => void;
 }) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [showAddMenu, setShowAddMenu] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const [selectedId, setSelectedId]     = useState<string | null>(null);
+  const [editingRule, setEditingRule]   = useState<NotificationRule | null>(null);
+  const [showAddMenu, setShowAddMenu]   = useState(false);
+  const [menuPos, setMenuPos]           = useState({ bottom: 0, left: 0 });
+  const plusRef = useRef<HTMLButtonElement>(null);
 
-  const selectedRule = rules.find((r) => r.id === selectedId) ?? null;
-
-  // Close dropdown on outside click
+  // Close modal on Escape
   useEffect(() => {
-    if (!showAddMenu) return;
-    const handler = (e: PointerEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setShowAddMenu(false);
-      }
-    };
-    window.addEventListener("pointerdown", handler);
-    return () => window.removeEventListener("pointerdown", handler);
-  }, [showAddMenu]);
+    if (!editingRule) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setEditingRule(null); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [editingRule]);
+
+  const openAddMenu = () => {
+    if (plusRef.current) {
+      const r = plusRef.current.getBoundingClientRect();
+      setMenuPos({ bottom: window.innerHeight - r.top + 4, left: r.left });
+    }
+    setShowAddMenu(true);
+  };
 
   const addRule = (type: NotificationRule["type"]) => {
     const rule = makeDefaultRule(type);
     onChange([...rules, rule]);
     setSelectedId(rule.id);
+    setEditingRule(rule);
     setShowAddMenu(false);
   };
 
@@ -301,10 +283,13 @@ function RuleList({
     if (!selectedId) return;
     onChange(rules.filter((r) => r.id !== selectedId));
     setSelectedId(null);
+    setEditingRule(null);
   };
 
-  const updateRule = (updated: NotificationRule) =>
+  const updateRule = (updated: NotificationRule) => {
     onChange(rules.map((r) => (r.id === updated.id ? updated : r)));
+    setEditingRule(updated);
+  };
 
   return (
     <div className="space-y-1.5">
@@ -318,7 +303,7 @@ function RuleList({
           rules.map((rule, i) => (
             <button
               key={rule.id}
-              onClick={() => setSelectedId(selectedId === rule.id ? null : rule.id)}
+              onClick={() => { setSelectedId(rule.id); setEditingRule(rule); }}
               className={`w-full px-3 py-2 text-left text-xs transition-colors ${
                 i < rules.length - 1 ? "border-b border-zinc-800" : ""
               } ${
@@ -334,26 +319,28 @@ function RuleList({
       </div>
 
       {/* + / − controls */}
-      <div className="relative" ref={menuRef}>
-        <div className="inline-flex border border-zinc-700 rounded-md overflow-hidden">
-          <button
-            onClick={() => setShowAddMenu((v) => !v)}
-            className="w-7 h-7 flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors border-r border-zinc-700 text-base leading-none"
-          >
-            +
-          </button>
-          <button
-            onClick={removeSelected}
-            disabled={!selectedId}
-            className="w-7 h-7 flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors text-base leading-none disabled:opacity-30 disabled:pointer-events-none"
-          >
-            −
-          </button>
-        </div>
+      <div className="inline-flex border border-zinc-700 rounded-md overflow-hidden">
+        <button
+          ref={plusRef}
+          onClick={openAddMenu}
+          className="w-7 h-7 flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors border-r border-zinc-700 text-base leading-none"
+        >+</button>
+        <button
+          onClick={removeSelected}
+          disabled={!selectedId}
+          className="w-7 h-7 flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors text-base leading-none disabled:opacity-30 disabled:pointer-events-none"
+        >−</button>
+      </div>
 
-        {/* Add dropdown */}
-        {showAddMenu && (
-          <div className="absolute bottom-full left-0 mb-1 bg-zinc-900 border border-zinc-700 rounded-lg overflow-hidden w-56 shadow-xl z-20">
+      {/* Add-type dropdown — rendered in a portal so it escapes overflow:hidden */}
+      {showAddMenu && createPortal(
+        <>
+          {/* invisible backdrop closes menu */}
+          <div className="fixed inset-0 z-40" onClick={() => setShowAddMenu(false)} />
+          <div
+            className="fixed z-50 bg-zinc-900 border border-zinc-700 rounded-lg overflow-hidden w-56 shadow-xl"
+            style={{ bottom: menuPos.bottom, left: menuPos.left }}
+          >
             {RULE_TYPES.map((rt, i) => (
               <button
                 key={rt.type}
@@ -367,11 +354,40 @@ function RuleList({
               </button>
             ))}
           </div>
-        )}
-      </div>
+        </>,
+        document.body
+      )}
 
-      {/* Rule editor — shown when a rule is selected */}
-      {selectedRule && <RuleEditor rule={selectedRule} onChange={updateRule} />}
+      {/* Rule editor — full-window modal portal */}
+      {editingRule && createPortal(
+        <div
+          className="fixed inset-0 bg-[#111111]/75 backdrop-blur-sm flex items-center justify-center z-50 p-5"
+          onClick={() => setEditingRule(null)}
+        >
+          <div
+            className="bg-zinc-900 border border-zinc-800 rounded-xl w-full shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
+              <p className="text-sm font-medium text-zinc-200">{ruleTypeLabel(editingRule.type)}</p>
+              <button
+                onClick={() => setEditingRule(null)}
+                className="text-zinc-500 hover:text-zinc-200 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            {/* Modal body */}
+            <div className="px-4 py-4">
+              <RuleEditor rule={editingRule} onChange={updateRule} />
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
@@ -379,11 +395,11 @@ function RuleList({
 // ── Main Settings view ───────────────────────────────────────────────────────
 
 export default function Settings({ auth, onBack, onLogout }: Props) {
-  const [settings, setSettings] = useState<SettingsType>(DEFAULT_SETTINGS);
+  const [settings, setSettings]         = useState<SettingsType>(DEFAULT_SETTINGS);
   const [savedSettings, setSavedSettings] = useState<SettingsType>(DEFAULT_SETTINGS);
-  const [showPrompt, setShowPrompt] = useState(false);
-  const [ntfyTesting, setNtfyTesting] = useState(false);
-  const [ntfyTestOk, setNtfyTestOk] = useState(false);
+  const [showPrompt, setShowPrompt]     = useState(false);
+  const [ntfyTesting, setNtfyTesting]   = useState(false);
+  const [ntfyTestOk, setNtfyTestOk]     = useState(false);
   const [ntfyTestError, setNtfyTestError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -430,8 +446,8 @@ export default function Settings({ auth, onBack, onLogout }: Props) {
   };
 
   const INTERVALS = [
-    { label: "30s", value: 30 },
-    { label: "1m",  value: 60 },
+    { label: "30s", value: 30  },
+    { label: "1m",  value: 60  },
     { label: "5m",  value: 300 },
     { label: "15m", value: 900 },
   ];
@@ -460,16 +476,12 @@ export default function Settings({ auth, onBack, onLogout }: Props) {
       <div className="flex-1 overflow-y-auto px-4 py-4 pb-20 space-y-3">
         {/* General */}
         <Section title="General">
-          <Toggle
-            label="Launch at startup"
+          <Toggle label="Launch at startup"
             value={settings.launch_at_startup}
-            onChange={(v) => update({ launch_at_startup: v })}
-          />
-          <Toggle
-            label="Minimize to tray on close"
+            onChange={(v) => update({ launch_at_startup: v })} />
+          <Toggle label="Minimize to tray on close"
             value={settings.minimize_to_tray}
-            onChange={(v) => update({ minimize_to_tray: v })}
-          />
+            onChange={(v) => update({ minimize_to_tray: v })} />
         </Section>
 
         {/* Display */}
@@ -478,39 +490,33 @@ export default function Settings({ auth, onBack, onLogout }: Props) {
             label="Always show precise timestamp"
             description="Shows exact time (e.g. 'Updated at 11:47:59 pm') instead of relative"
             value={settings.precise_timestamp}
-            onChange={(v) => update({ precise_timestamp: v })}
-          />
+            onChange={(v) => update({ precise_timestamp: v })} />
         </Section>
 
         {/* Notifications */}
         <Section title="Notifications">
-          <RuleList
-            rules={settings.notification_rules}
-            onChange={(rules) => update({ notification_rules: rules })}
-          />
+          <Toggle
+            label="Enable desktop notifications"
+            value={settings.notifications_enabled}
+            onChange={(v) => update({ notifications_enabled: v })} />
+          {settings.notifications_enabled && (
+            <RuleList
+              rules={settings.notification_rules}
+              onChange={(rules) => update({ notification_rules: rules })} />
+          )}
         </Section>
 
         {/* ntfy */}
         <Section title="ntfy">
-          <Toggle
-            label="Enable ntfy"
+          <Toggle label="Enable ntfy"
             value={settings.ntfy_enabled}
-            onChange={(v) => update({ ntfy_enabled: v })}
-          />
+            onChange={(v) => update({ ntfy_enabled: v })} />
           {settings.ntfy_enabled && (
             <>
-              <Field
-                label="Server"
-                value={settings.ntfy_server}
-                onChange={(v) => update({ ntfy_server: v })}
-                placeholder="https://ntfy.sh"
-              />
-              <Field
-                label="Topic"
-                value={settings.ntfy_topic}
-                onChange={(v) => update({ ntfy_topic: v })}
-                placeholder="claudeometer"
-              />
+              <Field label="Server" value={settings.ntfy_server} placeholder="https://ntfy.sh"
+                onChange={(v) => update({ ntfy_server: v })} />
+              <Field label="Topic" value={settings.ntfy_topic} placeholder="claudeometer"
+                onChange={(v) => update({ ntfy_topic: v })} />
               <div className="flex items-center justify-between gap-3">
                 <p className="text-xs text-zinc-500 shrink-0">Test connection</p>
                 <button
@@ -530,8 +536,7 @@ export default function Settings({ auth, onBack, onLogout }: Props) {
                 <p className="text-xs text-zinc-500">Rules</p>
                 <RuleList
                   rules={settings.ntfy_rules}
-                  onChange={(rules) => update({ ntfy_rules: rules })}
-                />
+                  onChange={(rules) => update({ ntfy_rules: rules })} />
               </div>
             </>
           )}
@@ -549,9 +554,7 @@ export default function Settings({ auth, onBack, onLogout }: Props) {
                     ? "bg-amber-600/10 border-amber-600/40 text-amber-500"
                     : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-zinc-200"
                 }`}
-              >
-                Off
-              </button>
+              >Off</button>
               {INTERVALS.map((i) => (
                 <button
                   key={i.value}
@@ -561,9 +564,7 @@ export default function Settings({ auth, onBack, onLogout }: Props) {
                       ? "bg-amber-600/10 border-amber-600/40 text-amber-500"
                       : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-zinc-200"
                   }`}
-                >
-                  {i.label}
-                </button>
+                >{i.label}</button>
               ))}
             </div>
           </div>
@@ -571,16 +572,13 @@ export default function Settings({ auth, onBack, onLogout }: Props) {
             label="Refresh on focus"
             description="Fetch new data when the app window gains focus"
             value={settings.foreground_poll}
-            onChange={(v) => update({ foreground_poll: v })}
-          />
+            onChange={(v) => update({ foreground_poll: v })} />
         </Section>
 
         {/* Account */}
         <Section title="Account">
           <div className="space-y-0.5">
-            {auth.name && (
-              <p className="text-sm font-medium text-zinc-200">{auth.name}</p>
-            )}
+            {auth.name && <p className="text-sm font-medium text-zinc-200">{auth.name}</p>}
             {auth.email ? (
               <p className={auth.name ? "text-xs text-zinc-500" : "text-sm text-zinc-300"}>
                 {auth.email}
@@ -619,22 +617,16 @@ export default function Settings({ auth, onBack, onLogout }: Props) {
               <p className="text-xs text-zinc-500 mt-1">Leave without saving?</p>
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={() => setShowPrompt(false)}
-                className="flex-1 text-xs py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors"
-              >
+              <button onClick={() => setShowPrompt(false)}
+                className="flex-1 text-xs py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors">
                 Keep editing
               </button>
-              <button
-                onClick={onBack}
-                className="flex-1 text-xs py-2 rounded-lg text-red-400 hover:text-red-300 bg-red-500/5 hover:bg-red-500/10 border border-red-500/20 transition-colors"
-              >
+              <button onClick={onBack}
+                className="flex-1 text-xs py-2 rounded-lg text-red-400 hover:text-red-300 bg-red-500/5 hover:bg-red-500/10 border border-red-500/20 transition-colors">
                 Discard
               </button>
-              <button
-                onClick={save}
-                className="flex-1 text-xs py-2 rounded-lg text-white bg-amber-600 hover:bg-amber-500 transition-colors"
-              >
+              <button onClick={save}
+                className="flex-1 text-xs py-2 rounded-lg text-white bg-amber-600 hover:bg-amber-500 transition-colors">
                 Save
               </button>
             </div>

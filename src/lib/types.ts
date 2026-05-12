@@ -30,6 +30,7 @@ export type NotificationRule =
 export interface Settings {
   launch_at_startup: boolean;
   minimize_to_tray: boolean;
+  notifications_enabled: boolean;
   notification_rules: NotificationRule[];
   ntfy_enabled: boolean;
   ntfy_server: string;
@@ -44,6 +45,7 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   launch_at_startup: false,
   minimize_to_tray: true,
+  notifications_enabled: true,
   notification_rules: [],
   ntfy_enabled: false,
   ntfy_server: "https://ntfy.sh",

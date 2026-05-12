@@ -357,12 +357,14 @@ async fn check_notification_rules(
         (s.prev_util.clone(), s.prev_reset_mins.clone())
     };
 
-    // Desktop notifications
-    for rule in &settings.notification_rules {
-        if rule_fires(rule, &cur_util, &cur_reset, &prev_util, &prev_reset) {
-            let (title, body) = rule_message(rule, &cur_util);
-            use tauri_plugin_notification::NotificationExt;
-            let _ = app.notification().builder().title(&title).body(&body).show();
+    // Desktop notifications (only when enabled)
+    if settings.notifications_enabled {
+        for rule in &settings.notification_rules {
+            if rule_fires(rule, &cur_util, &cur_reset, &prev_util, &prev_reset) {
+                let (title, body) = rule_message(rule, &cur_util);
+                use tauri_plugin_notification::NotificationExt;
+                let _ = app.notification().builder().title(&title).body(&body).show();
+            }
         }
     }
 
