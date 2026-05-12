@@ -8,6 +8,7 @@ import WindowControls from "../components/WindowControls";
 
 interface Props {
   auth: AuthState;
+  isFocused: boolean;
   onBack: () => void;
   onLogout: () => void;
 }
@@ -461,7 +462,7 @@ function RuleList({ rules, onChange }: {
 
 // ── Main Settings view ───────────────────────────────────────────────────────
 
-export default function Settings({ auth, onBack, onLogout }: Props) {
+export default function Settings({ auth, isFocused, onBack, onLogout }: Props) {
   const [settings, setSettings]           = useState<SettingsType>(DEFAULT_SETTINGS);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [ntfyTesting, setNtfyTesting]     = useState(false);
@@ -545,7 +546,7 @@ export default function Settings({ auth, onBack, onLogout }: Props) {
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <span className="text-[13px] font-semibold text-zinc-200 pointer-events-none tracking-tight">Settings</span>
+          <span className={`text-[13px] font-semibold pointer-events-none tracking-tight transition-colors duration-200 ${isFocused ? "text-zinc-200" : "text-zinc-500"}`}>Settings</span>
         </div>
         <WindowControls />
       </div>

@@ -13,6 +13,7 @@ const COOLDOWN_MS = 20_000;
 
 export default function App() {
   const [view, setView] = useState<View>("login");
+  const [isFocused, setIsFocused] = useState(true);
   const [auth, setAuth] = useState<AuthState>({ mode: "none", email: null, name: null });
   const [usage, setUsage] = useState<UsageData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -84,6 +85,15 @@ export default function App() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [auth.mode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Track focus for title bar dimming (always active)
+  useEffect(() => {
+    let cleanup: (() => void) | undefined;
+    getCurrentWindow()
+      .onFocusChanged(({ payload: focused }) => setIsFocused(focused))
+      .then((unlisten) => { cleanup = unlisten; });
+    return () => cleanup?.();
+  }, []);
 
   // Auto-refresh when the window comes into focus
   useEffect(() => {
@@ -178,6 +188,7 @@ export default function App() {
           cooldownEndsAt={cooldownEndsAt}
           preciseTimestamp={settings.precise_timestamp}
           hideCooldownBadge={settings.hide_cooldown_badge}
+          isFocused={isFocused}
           onSettings={() => setView("settings")}
           onRefresh={doRefresh}
         />
@@ -185,6 +196,7 @@ export default function App() {
       {view === "settings" && (
         <Settings_
           auth={auth}
+          isFocused={isFocused}
           onBack={handleBackFromSettings}
           onLogout={handleLogout}
         />

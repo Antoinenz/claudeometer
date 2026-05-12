@@ -10,6 +10,7 @@ interface Props {
   cooldownEndsAt: number | null;
   preciseTimestamp: boolean;
   hideCooldownBadge: boolean;
+  isFocused: boolean;
   onSettings: () => void;
   onRefresh: () => void;
 }
@@ -89,7 +90,7 @@ function formatTimestamp(ts: string, precise: boolean): string {
   }
 }
 
-export default function Dashboard({ usage, error, isRefreshing, cooldownEndsAt, preciseTimestamp, hideCooldownBadge, onSettings, onRefresh }: Props) {
+export default function Dashboard({ usage, error, isRefreshing, cooldownEndsAt, preciseTimestamp, hideCooldownBadge, isFocused, onSettings, onRefresh }: Props) {
   // Ticker so relative timestamps update automatically
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -122,7 +123,7 @@ export default function Dashboard({ usage, error, isRefreshing, cooldownEndsAt, 
       >
         <div className="flex items-center gap-2 pointer-events-none">
           <img src="/icon.png" alt="" className="w-[18px] h-[18px] rounded" draggable={false} />
-          <span className="text-[13px] font-semibold text-zinc-200 tracking-tight">Claudeometer</span>
+          <span className={`text-[13px] font-semibold tracking-tight transition-colors duration-200 ${isFocused ? "text-zinc-200" : "text-zinc-500"}`}>Claudeometer</span>
         </div>
         <div className="flex items-center gap-0.5">
           <button
