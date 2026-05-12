@@ -538,7 +538,7 @@ export default function Settings({ auth, onBack, onLogout }: Props) {
         <div className="flex items-center gap-1.5">
           <button
             onClick={onBack}
-            className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800/80 transition-colors"
+            className="-ml-1.5 p-1.5 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800/80 transition-colors"
             title="Back"
           >
             <svg className="w-[15px] h-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
