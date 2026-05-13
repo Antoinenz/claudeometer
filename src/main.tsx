@@ -22,13 +22,13 @@ if (isTrayMenu) {
 document.addEventListener("contextmenu", (e) => e.preventDefault());
 
 // Fix stuck :hover states on Windows/WebView2.
-// When a window is hidden and reshown Chromium retains the last :hover state
-// because no mouseleave fires during hide. Setting pointer-events on the root
-// alone is unreliable — elements with pointer-events-auto (Tailwind or inline)
-// override it. Injecting a stylesheet with !important overrides everything, and
-// double-rAF ensures a full paint cycle has flushed before restoring, which
-// covers transitions that would otherwise keep the colour visible for one frame.
-// We guard with a flag so rapid double-fires (browser + Tauri events) collapse.
+// Clearing on BLUR rather than FOCUS means hover states are already clean when
+// the window regains focus. Clearing on focus instead would inject
+// pointer-events:none BEFORE the browser delivers the activating mousedown
+// (Windows sends WM_SETFOCUS before WM_LBUTTONDOWN), which breaks first-click
+// registration. On blur the cursor is either leaving the window (hover would
+// clear naturally) or the user switched apps via keyboard — both cases should
+// clear hover. Double-rAF lets transitions finish before restoring.
 let _clearHoverPending = false;
 function clearHoverStates() {
   if (_clearHoverPending) return;
@@ -44,12 +44,9 @@ function clearHoverStates() {
   );
 }
 
-// Two listeners for belt-and-suspenders: the browser focus event covers most
-// cases; the Tauri native event catches WebView2 edge cases where the browser
-// event fires late or not at all (e.g. window shown without changing OS focus).
-window.addEventListener("focus", clearHoverStates, true);
+window.addEventListener("blur", clearHoverStates, true);
 getCurrentWindow()
-  .onFocusChanged(({ payload: focused }) => { if (focused) clearHoverStates(); })
+  .onFocusChanged(({ payload: focused }) => { if (!focused) clearHoverStates(); })
   .catch(() => {});
 
 // Mutable flags — updated at runtime by App when settings load/change.
