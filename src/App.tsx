@@ -118,6 +118,7 @@ export default function App() {
 
     refreshingRef.current = true;
     setIsRefreshing(true);
+    const startedAt = Date.now();
     try {
       const d = await invoke<UsageData>("fetch_usage");
       setUsage(d);
@@ -133,6 +134,12 @@ export default function App() {
     } catch (e) {
       updateError(String(e));
     } finally {
+      // If the error persists (nothing changed), pad to a minimum duration so
+      // the spinner doesn't flicker and the user feels confident it actually checked.
+      if (errorRef.current) {
+        const elapsed = Date.now() - startedAt;
+        if (elapsed < 1500) await new Promise(r => setTimeout(r, 1500 - elapsed));
+      }
       setIsRefreshing(false);
       refreshingRef.current = false;
       // Only apply cooldown after a successful fetch (not after errors, so retries are fast)
