@@ -20,6 +20,18 @@ if (isTrayMenu) {
 // No right-click context menu
 document.addEventListener("contextmenu", (e) => e.preventDefault());
 
+// Fix stuck :hover states on Windows/WebView2.
+// When a window is hidden and reshown the browser retains the last :hover
+// state because no mouseleave event fires during hide. Briefly disabling
+// pointer-events on the root forces Chromium to clear hover for every element,
+// then the next frame re-evaluates from the real cursor position.
+window.addEventListener("focus", () => {
+  document.documentElement.style.pointerEvents = "none";
+  requestAnimationFrame(() => {
+    document.documentElement.style.pointerEvents = "";
+  });
+});
+
 // Mutable flags — updated at runtime by App when settings load/change.
 const debugFlags = { devtools: false, webviewReload: false };
 export function applyDebugFlags(flags: { devtools: boolean; webviewReload: boolean }) {
