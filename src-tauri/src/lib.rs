@@ -166,12 +166,9 @@ async fn poll_once(app: &AppHandle, poll_state: &SharedPollState) {
 
     let result = match mode.as_str() {
         "session_key" => {
-            let key = store
-                .get("session_key")
-                .and_then(|v| v.as_str().map(str::to_string));
-            match key {
-                Some(k) => claude::fetch_claude_usage(&k).await,
-                None => return,
+            match commands::get_keyring_session_key(&store) {
+                Ok(k) => claude::fetch_claude_usage(&k).await,
+                Err(_) => return,
             }
         }
         _ => return,

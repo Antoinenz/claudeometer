@@ -24,6 +24,7 @@ serde_json = "1"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "cookies"] }
 tokio = { version = "1", features = ["full"] }
 chrono = { version = "0.4", features = ["serde"] }
+keyring = "2"
 
 [profile.release]
 panic = "abort"

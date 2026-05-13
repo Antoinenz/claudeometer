@@ -1,8 +1,37 @@
 use crate::claude::{fetch_claude_usage, UsageData};
+use keyring::Entry;
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_store::StoreExt;
+
+const KEYRING_SERVICE: &str = "claudeometer";
+const KEYRING_ACCOUNT: &str = "session_key";
+
+/// Read the session key from the OS keychain.
+/// On first run after an upgrade, migrates a plain-text key from the store
+/// into the keychain and removes it from the store file.
+pub(crate) fn get_keyring_session_key(store: &tauri_plugin_store::Store<tauri::Wry>) -> Result<String, String> {
+    let entry = Entry::new(KEYRING_SERVICE, KEYRING_ACCOUNT)
+        .map_err(|e| format!("Keychain unavailable: {e}"))?;
+
+    if let Ok(key) = entry.get_password() {
+        return Ok(key);
+    }
+
+    // Migration path: key was previously stored in plain text.
+    if let Some(key) = store
+        .get("session_key")
+        .and_then(|v| v.as_str().map(str::to_string))
+    {
+        let _ = entry.set_password(&key);
+        store.delete("session_key");
+        let _ = store.save();
+        return Ok(key);
+    }
+
+    Err("No session key stored".to_string())
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AuthState {
@@ -88,9 +117,16 @@ pub async fn save_session_key(app: AppHandle, key: String) -> Result<AuthState, 
     let usage = fetch_claude_usage(&key).await?;
     let email = usage.email.clone();
     let name = usage.name.clone();
+
+    // Store the credential in the OS keychain — never write it to the JSON store.
+    let entry = Entry::new(KEYRING_SERVICE, KEYRING_ACCOUNT)
+        .map_err(|e| format!("Keychain unavailable: {e}"))?;
+    entry.set_password(&key).map_err(|e| format!("Failed to save to keychain: {e}"))?;
+
     let store = app.store("store.json").unwrap();
     store.set("auth_mode", "session_key");
-    store.set("session_key", key.clone());
+    // Ensure any legacy plain-text key is removed
+    store.delete("session_key");
     if let Some(ref e) = email {
         store.set("email", e.clone());
     }
@@ -98,6 +134,7 @@ pub async fn save_session_key(app: AppHandle, key: String) -> Result<AuthState, 
         store.set("name", n.clone());
     }
     store.save().map_err(|e| e.to_string())?;
+
     Ok(AuthState {
         mode: "session_key".to_string(),
         email,
@@ -107,9 +144,14 @@ pub async fn save_session_key(app: AppHandle, key: String) -> Result<AuthState, 
 
 #[tauri::command]
 pub async fn logout(app: AppHandle) -> Result<(), String> {
+    // Remove from OS keychain
+    if let Ok(entry) = Entry::new(KEYRING_SERVICE, KEYRING_ACCOUNT) {
+        let _ = entry.delete_password();
+    }
+
     let store = app.store("store.json").unwrap();
     store.set("auth_mode", "none");
-    store.delete("session_key");
+    store.delete("session_key"); // remove legacy plain-text key if present
     store.delete("email");
     store.delete("name");
     store.save().map_err(|e| e.to_string())?;
@@ -126,10 +168,7 @@ pub async fn fetch_usage(app: AppHandle) -> Result<UsageData, String> {
 
     let result = match mode.as_str() {
         "session_key" => {
-            let key = store
-                .get("session_key")
-                .and_then(|v| v.as_str().map(str::to_string))
-                .ok_or("No session key stored")?;
+            let key = get_keyring_session_key(&store)?;
             fetch_claude_usage(&key).await
         }
         _ => Err("Not authenticated".to_string()),
