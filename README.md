@@ -1,6 +1,6 @@
 # Claudeometer
 
-A lightweight desktop app for monitoring your [Claude.ai](https://claude.ai) usage limits in real time.
+A lightweight yet feature packed (and and potentially slightly overengineered) desktop app for monitoring your [Claude](https://claude.ai) usage limits in real time.
 
 ![Tauri](https://img.shields.io/badge/Tauri_v2-000000?logo=tauri) ![React](https://img.shields.io/badge/React_18-000000?logo=react) ![TypeScript](https://img.shields.io/badge/TypeScript-000000?logo=typescript)
 
@@ -10,9 +10,10 @@ A lightweight desktop app for monitoring your [Claude.ai](https://claude.ai) usa
 - Automatic background polling with a configurable interval
 - Refresh on window focus
 - Desktop notifications with customisable rules (threshold, spike, reset soon, recovery)
+- Tray icon with menu
 - [ntfy](https://ntfy.sh) push notification support
-- Session key stored securely in the OS keychain — never written to disk in plain text
-- Minimal footprint — built with Tauri, not Electron
+- Session key stored securely in the OS keychain
+- Minimal footprint - built with Tauri instead of Electron
 
 ## Getting started
 
