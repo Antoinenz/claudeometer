@@ -219,6 +219,8 @@ pub fn attach_main_close_behavior(window: &tauri::WebviewWindow, handle: AppHand
                 if let Some(w) = handle.get_webview_window("main") {
                     let _ = w.hide();
                 }
+            } else {
+                handle.exit(0);
             }
         }
     });
