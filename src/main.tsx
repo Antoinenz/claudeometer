@@ -1,6 +1,5 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import App from "./App";
 import TrayMenu from "./views/TrayMenu";
 import "./index.css";
@@ -21,33 +20,6 @@ if (isTrayMenu) {
 // No right-click context menu
 document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-// Fix stuck :hover states on Windows/WebView2.
-// Clearing on BLUR rather than FOCUS means hover states are already clean when
-// the window regains focus. Clearing on focus instead would inject
-// pointer-events:none BEFORE the browser delivers the activating mousedown
-// (Windows sends WM_SETFOCUS before WM_LBUTTONDOWN), which breaks first-click
-// registration. On blur the cursor is either leaving the window (hover would
-// clear naturally) or the user switched apps via keyboard — both cases should
-// clear hover. Double-rAF lets transitions finish before restoring.
-let _clearHoverPending = false;
-function clearHoverStates() {
-  if (_clearHoverPending) return;
-  _clearHoverPending = true;
-  const s = document.createElement("style");
-  s.textContent = "* { pointer-events: none !important; }";
-  document.head.appendChild(s);
-  requestAnimationFrame(() =>
-    requestAnimationFrame(() => {
-      document.head.removeChild(s);
-      _clearHoverPending = false;
-    })
-  );
-}
-
-window.addEventListener("blur", clearHoverStates, true);
-getCurrentWindow()
-  .onFocusChanged(({ payload: focused }) => { if (!focused) clearHoverStates(); })
-  .catch(() => {});
 
 // Mutable flags — updated at runtime by App when settings load/change.
 const debugFlags = { devtools: false, webviewReload: false };

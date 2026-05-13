@@ -4,12 +4,28 @@ interface Props {
   isFocused?: boolean;
 }
 
+// Inject pointer-events:none so :hover clears before the window hides, then
+// remove it the moment the cursor re-enters the window after it's reshown.
+// Using mousemove (not a timeout) means pointer-events is only restored once
+// the cursor is physically inside, so Chromium evaluates hover from the real
+// position instead of its stale cached one.
+function clearGhostHover() {
+  const s = document.createElement("style");
+  s.textContent = "* { pointer-events: none !important; }";
+  document.head.appendChild(s);
+  window.addEventListener(
+    "mousemove",
+    () => { if (document.head.contains(s)) document.head.removeChild(s); },
+    { once: true, capture: true },
+  );
+}
+
 export default function WindowControls({ isFocused = true }: Props) {
   const win = getCurrentWindow();
   return (
     <div className="flex items-center gap-0.5">
       <button
-        onClick={() => win.minimize()}
+        onClick={() => { clearGhostHover(); win.minimize(); }}
         className={`p-1.5 flex items-center justify-center rounded-md transition-colors hover:text-zinc-200 hover:bg-zinc-800/80 ${
           isFocused ? "text-zinc-600" : "text-zinc-700"
         }`}
@@ -20,7 +36,7 @@ export default function WindowControls({ isFocused = true }: Props) {
         </svg>
       </button>
       <button
-        onClick={() => win.close()}
+        onClick={() => { clearGhostHover(); win.close(); }}
         className={`p-1.5 flex items-center justify-center rounded-md transition-colors hover:text-red-400 hover:bg-red-500/10 ${
           isFocused ? "text-zinc-600" : "text-zinc-700"
         }`}

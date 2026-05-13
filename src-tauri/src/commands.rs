@@ -347,10 +347,7 @@ fn create_main_window(app: &AppHandle) -> Option<tauri::WebviewWindow> {
             crate::attach_main_close_behavior(&w, app.clone());
             Some(w)
         }
-        Err(e) => {
-            eprintln!("[tray] failed to recreate main window: {e}");
-            None
-        }
+        Err(_) => None,
     }
 }
 
@@ -366,65 +363,31 @@ fn create_main_window(app: &AppHandle) -> Option<tauri::WebviewWindow> {
 /// would return immediately and JS would advance before the show/focus has
 /// actually happened.
 fn bring_main_to_front(app: &AppHandle) {
-    eprintln!("[bring_main] scheduling closure on main thread");
-    let (tx, rx) = std::sync::mpsc::channel::<&'static str>();
+    let (tx, rx) = std::sync::mpsc::channel::<()>();
     let handle = app.clone();
-    let scheduled = app.run_on_main_thread(move || {
-        eprintln!("[bring_main] closure running on main thread");
-        let main = handle.get_webview_window("main").or_else(|| {
-            eprintln!("[bring_main] main window missing — recreating");
-            create_main_window(&handle)
-        });
+    let _ = app.run_on_main_thread(move || {
+        let main = handle
+            .get_webview_window("main")
+            .or_else(|| create_main_window(&handle));
 
         if let Some(w) = main {
-            eprintln!(
-                "[bring_main] main found: visible={:?} minimized={:?}",
-                w.is_visible(),
-                w.is_minimized()
-            );
-            if let Err(e) = w.unminimize() {
-                eprintln!("[bring_main] unminimize err: {e}");
-            }
-            if let Err(e) = w.show() {
-                eprintln!("[bring_main] show err: {e}");
-            }
-            if let Err(e) = w.set_always_on_top(true) {
-                eprintln!("[bring_main] set_always_on_top(true) err: {e}");
-            }
-            if let Err(e) = w.set_focus() {
-                eprintln!("[bring_main] set_focus err: {e}");
-            }
-            if let Err(e) = w.set_always_on_top(false) {
-                eprintln!("[bring_main] set_always_on_top(false) err: {e}");
-            }
-            eprintln!(
-                "[bring_main] after: visible={:?} focused={:?}",
-                w.is_visible(),
-                w.is_focused()
-            );
-            let _ = tx.send("done");
-        } else {
-            eprintln!("[bring_main] no main window available");
-            let _ = tx.send("no_window");
+            let _ = w.unminimize();
+            let _ = w.show();
+            let _ = w.set_always_on_top(true);
+            let _ = w.set_focus();
+            let _ = w.set_always_on_top(false);
+            let _ = tx.send(());
         }
 
         if let Some(w) = handle.get_webview_window("tray-menu") {
             let _ = w.hide();
         }
     });
-
-    match scheduled {
-        Ok(()) => match rx.recv_timeout(std::time::Duration::from_millis(800)) {
-            Ok(status) => eprintln!("[bring_main] completed: {status}"),
-            Err(_) => eprintln!("[bring_main] timed out waiting for main thread"),
-        },
-        Err(e) => eprintln!("[bring_main] run_on_main_thread failed: {e}"),
-    }
+    let _ = rx.recv_timeout(std::time::Duration::from_millis(800));
 }
 
 #[tauri::command]
 pub fn tray_action(app: AppHandle, action: String) -> Result<(), String> {
-    eprintln!("[tray_action] action={action}");
     match action.as_str() {
         "show" => {
             bring_main_to_front(&app);

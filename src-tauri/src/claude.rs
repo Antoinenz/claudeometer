@@ -24,6 +24,7 @@ pub struct UsageData {
 }
 
 impl UsageData {
+    #[allow(dead_code)]
     pub fn max_utilization(&self) -> Option<f64> {
         [
             self.five_hour.as_ref().map(|w| w.utilization),
