@@ -4,7 +4,7 @@ mod commands;
 use commands::*;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tauri::{
     tray::{TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder,
@@ -13,6 +13,11 @@ use tauri_plugin_store::StoreExt;
 
 const TRAY_MENU_W: f64 = 220.0;
 const TRAY_MENU_H: f64 = 188.0;
+
+/// Timestamp of the last time the tray menu was hidden by focus-loss.
+/// Used to debounce tray-icon clicks so that clicking the icon while the
+/// menu is open closes it rather than immediately reopening it.
+struct TrayLastHide(Mutex<Option<Instant>>);
 
 /// Tracks utilization and reset-countdown values from the previous poll
 /// so we can implement edge-triggered notification rules.
@@ -51,6 +56,7 @@ pub fn run() {
             Ok(())
         })
         .manage(commands::UsageCache(std::sync::Mutex::new(None)))
+        .manage(TrayLastHide(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
             get_auth_state,
             save_session_key,
@@ -91,6 +97,17 @@ fn setup_tray(app: &mut tauri::App) -> tauri::Result<()> {
 /// Show the custom tray menu window positioned above (or below) the tray icon,
 /// horizontally centered on the icon. If the menu is already visible, hide it.
 fn toggle_tray_menu(app: &AppHandle, tray_rect: tauri::Rect) {
+    // If the menu was hidden by focus-loss in the last 300ms, the user clicked
+    // the tray icon while it was open. Don't reopen — treat it as a close.
+    let recently_closed = app
+        .try_state::<TrayLastHide>()
+        .and_then(|s| *s.0.lock().unwrap())
+        .map(|t| t.elapsed().as_millis() < 300)
+        .unwrap_or(false);
+    if recently_closed {
+        return;
+    }
+
     if let Some(w) = app.get_webview_window("tray-menu") {
         if w.is_visible().unwrap_or(false) {
             let _ = w.hide();
@@ -178,9 +195,13 @@ fn build_tray_menu_window(app: &AppHandle, arrow: &str) -> tauri::Result<tauri::
     .build()?;
 
     // Auto-hide when the menu loses focus (click outside, alt-tab, etc.)
+    // Record the time so the tray-icon click handler can debounce re-opens.
     let w_clone = w.clone();
     w.on_window_event(move |e| {
         if let tauri::WindowEvent::Focused(false) = e {
+            if let Some(state) = w_clone.app_handle().try_state::<TrayLastHide>() {
+                *state.0.lock().unwrap() = Some(Instant::now());
+            }
             let _ = w_clone.hide();
         }
     });
