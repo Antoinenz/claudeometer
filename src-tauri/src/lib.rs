@@ -22,6 +22,12 @@ pub struct TrayState(pub Mutex<Option<TrayIcon>>);
 /// menu is open closes it rather than immediately reopening it.
 struct TrayLastHide(Mutex<Option<Instant>>);
 
+/// Timestamp of the last time the tray menu window was made visible.
+/// Used to suppress spurious Focused(false) events that WebView2 fires
+/// during its own init sequence (which can arrive after Focused(true),
+/// defeating the old ever_focused guard).
+struct TrayLastShow(Mutex<Option<Instant>>);
+
 /// Tracks utilization and reset-countdown values from the previous poll
 /// so we can implement edge-triggered notification rules.
 struct PollState {
@@ -60,6 +66,7 @@ pub fn run() {
         })
         .manage(commands::UsageCache(std::sync::Mutex::new(None)))
         .manage(TrayLastHide(Mutex::new(None)))
+        .manage(TrayLastShow(Mutex::new(None)))
         .manage(TrayState(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
             get_auth_state,
@@ -195,6 +202,9 @@ fn toggle_tray_menu(app: &AppHandle, tray_rect: tauri::Rect) {
         serde_json::json!({ "arrow": arrow }),
     );
     let _ = window.show();
+    if let Some(state) = app.try_state::<TrayLastShow>() {
+        *state.0.lock().unwrap() = Some(Instant::now());
+    }
     let _ = window.set_focus();
 }
 
@@ -212,30 +222,28 @@ fn build_tray_menu_window(app: &AppHandle, arrow: &str) -> tauri::Result<tauri::
     .skip_taskbar(true)
     .resizable(false)
     .visible(false)
-    .focused(true)
     .shadow(false)
     .build()?;
 
     // Auto-hide when the menu loses focus (click outside, alt-tab, etc.).
-    // We only activate this after the window has been focused at least once —
-    // the WebView fires a spurious Focused(false) during initialisation (before
-    // set_focus() runs) which would otherwise hide the window on the very first
-    // click, making it appear as if two clicks are needed to open the menu.
+    // Guard: only hide if the window has been visible for ≥300 ms. WebView2 fires
+    // spurious Focused(false) events during initialisation — sometimes even after
+    // Focused(true) — so we cannot rely on an "ever_focused" flag alone.
     let w_clone = w.clone();
-    let ever_focused = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-    let ef = ever_focused.clone();
     w.on_window_event(move |e| {
-        match e {
-            tauri::WindowEvent::Focused(true) => {
-                ef.store(true, std::sync::atomic::Ordering::Relaxed);
-            }
-            tauri::WindowEvent::Focused(false) if ef.load(std::sync::atomic::Ordering::Relaxed) => {
+        if let tauri::WindowEvent::Focused(false) = e {
+            let shown_long_enough = w_clone
+                .app_handle()
+                .try_state::<TrayLastShow>()
+                .and_then(|s| *s.0.lock().unwrap())
+                .map(|t| t.elapsed().as_millis() >= 300)
+                .unwrap_or(false);
+            if shown_long_enough {
                 if let Some(state) = w_clone.app_handle().try_state::<TrayLastHide>() {
                     *state.0.lock().unwrap() = Some(Instant::now());
                 }
                 let _ = w_clone.hide();
             }
-            _ => {}
         }
     });
 
