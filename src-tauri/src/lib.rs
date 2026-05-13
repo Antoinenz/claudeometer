@@ -304,7 +304,7 @@ async fn poll_once(app: &AppHandle, poll_state: &SharedPollState) {
     match result {
         Ok(usage) => {
             if let Some(cache) = app.try_state::<commands::UsageCache>() {
-                *cache.0.lock().unwrap() = Some(usage.clone());
+                *cache.0.lock().unwrap() = Some((usage.clone(), commands::now_ms()));
             }
             let _ = app.emit("usage-updated", &usage);
             check_notification_rules(app, &usage, poll_state).await;

@@ -10,6 +10,16 @@ const COOLDOWN_MS = 20_000;
 
 const initialArrow: Arrow = window.location.hash === "#tray-menu-up" ? "up" : "down";
 
+function formatAgo(ts: number): string {
+  const diffSecs = Math.floor((Date.now() - ts) / 1000);
+  if (diffSecs < 60) return "Now";
+  const mins = Math.floor(diffSecs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
 function formatReset(resetsAt: string): string {
   try {
     const diff = new Date(resetsAt).getTime() - Date.now();
@@ -110,13 +120,18 @@ export default function TrayMenu() {
   const [cooldownEndsAt, setCooldownEndsAt] = useState<number | null>(null);
   const [cooldownSecsLeft, setCooldownSecsLeft] = useState<number>(0);
   const [hideCooldownBadge, setHideCooldownBadge] = useState(false);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
+  const [, setTick] = useState(0);
 
   const pendingRefreshesRef = useRef(0);
   const cooldownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    invoke<UsageData | null>("get_cached_usage")
-      .then((d) => setUsage(d))
+    invoke<{ data: UsageData; fetched_at_ms: number } | null>("get_cached_usage")
+      .then((r) => {
+        setUsage(r?.data ?? null);
+        if (r) setLastUpdatedAt(r.fetched_at_ms);
+      })
       .catch(() => setUsage(null));
 
     invoke<Settings>("get_settings")
@@ -125,6 +140,7 @@ export default function TrayMenu() {
 
     const unlistenUsage = listen<UsageData>("usage-updated", (e) => {
       setUsage(e.payload);
+      setLastUpdatedAt(Date.now());
     });
     const unlistenError = listen<string>("usage-error", () => {
       setUsage(null);
@@ -179,6 +195,13 @@ export default function TrayMenu() {
       if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
     };
   }, [cooldownEndsAt]);
+
+  // Re-render every 30s so the "X ago" string stays current.
+  useEffect(() => {
+    if (!lastUpdatedAt) return;
+    const id = setInterval(() => setTick((t) => t + 1), 30_000);
+    return () => clearInterval(id);
+  }, [lastUpdatedAt]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -235,6 +258,11 @@ export default function TrayMenu() {
           <span className="text-[11.5px] font-semibold text-zinc-200 tracking-tight leading-none">
             Claudeometer
           </span>
+          {lastUpdatedAt && (
+            <span className="ml-auto text-[9.5px] text-zinc-600 font-mono tabular-nums leading-none shrink-0">
+              {formatAgo(lastUpdatedAt)}
+            </span>
+          )}
         </div>
 
         <div className="h-px bg-zinc-800/60" />

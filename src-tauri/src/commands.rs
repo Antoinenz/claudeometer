@@ -6,9 +6,23 @@ use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder, async
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_store::StoreExt;
 
-/// Last successfully fetched usage, shared between the background poller,
-/// the fetch_usage command, and the tray menu's get_cached_usage command.
-pub struct UsageCache(pub Mutex<Option<UsageData>>);
+/// Last successfully fetched usage plus the Unix-ms timestamp of that fetch.
+/// Shared between the background poller, fetch_usage, and get_cached_usage.
+pub struct UsageCache(pub Mutex<Option<(UsageData, u64)>>);
+
+/// Current Unix time in milliseconds.
+pub(crate) fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+#[derive(Serialize, Clone)]
+pub struct CachedUsage {
+    pub data: UsageData,
+    pub fetched_at_ms: u64,
+}
 
 const KEYRING_SERVICE: &str = "claudeometer";
 const KEYRING_ACCOUNT: &str = "session_key";
@@ -190,7 +204,7 @@ async fn do_fetch_usage(app: &AppHandle) -> Result<UsageData, String> {
         }
         let _ = store.save();
         if let Some(cache) = app.try_state::<UsageCache>() {
-            *cache.0.lock().unwrap() = Some(data.clone());
+            *cache.0.lock().unwrap() = Some((data.clone(), now_ms()));
         }
     }
 
@@ -223,15 +237,18 @@ async fn do_tray_refresh(handle: &AppHandle) -> Result<(), String> {
     let key = get_keyring_session_key(&store)?;
     let usage = fetch_claude_usage(&key).await?;
     if let Some(cache) = handle.try_state::<UsageCache>() {
-        *cache.0.lock().unwrap() = Some(usage.clone());
+        *cache.0.lock().unwrap() = Some((usage.clone(), now_ms()));
     }
     let _ = handle.emit("usage-updated", &usage);
     Ok(())
 }
 
 #[tauri::command]
-pub fn get_cached_usage(state: tauri::State<'_, UsageCache>) -> Option<UsageData> {
-    state.0.lock().unwrap().clone()
+pub fn get_cached_usage(state: tauri::State<'_, UsageCache>) -> Option<CachedUsage> {
+    state.0.lock().unwrap().as_ref().map(|(data, ts)| CachedUsage {
+        data: data.clone(),
+        fetched_at_ms: *ts,
+    })
 }
 
 #[tauri::command]
