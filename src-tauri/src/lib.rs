@@ -216,15 +216,26 @@ fn build_tray_menu_window(app: &AppHandle, arrow: &str) -> tauri::Result<tauri::
     .shadow(false)
     .build()?;
 
-    // Auto-hide when the menu loses focus (click outside, alt-tab, etc.)
-    // Record the time so the tray-icon click handler can debounce re-opens.
+    // Auto-hide when the menu loses focus (click outside, alt-tab, etc.).
+    // We only activate this after the window has been focused at least once —
+    // the WebView fires a spurious Focused(false) during initialisation (before
+    // set_focus() runs) which would otherwise hide the window on the very first
+    // click, making it appear as if two clicks are needed to open the menu.
     let w_clone = w.clone();
+    let ever_focused = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let ef = ever_focused.clone();
     w.on_window_event(move |e| {
-        if let tauri::WindowEvent::Focused(false) = e {
-            if let Some(state) = w_clone.app_handle().try_state::<TrayLastHide>() {
-                *state.0.lock().unwrap() = Some(Instant::now());
+        match e {
+            tauri::WindowEvent::Focused(true) => {
+                ef.store(true, std::sync::atomic::Ordering::Relaxed);
             }
-            let _ = w_clone.hide();
+            tauri::WindowEvent::Focused(false) if ef.load(std::sync::atomic::Ordering::Relaxed) => {
+                if let Some(state) = w_clone.app_handle().try_state::<TrayLastHide>() {
+                    *state.0.lock().unwrap() = Some(Instant::now());
+                }
+                let _ = w_clone.hide();
+            }
+            _ => {}
         }
     });
 
