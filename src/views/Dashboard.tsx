@@ -150,16 +150,20 @@ export default function Dashboard({ usage, error, isRefreshing, cooldownEndsAt, 
             }`}
           >
             <div className="relative">
-              <svg
+              <div
                 className={`w-[15px] h-[15px] ${isRefreshing ? "animate-spin" : ""}`}
                 style={isRefreshing ? { animationDirection: "reverse" } : undefined}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
               >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
+                <svg
+                  className="w-full h-full"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </div>
               {inCooldown && !hideCooldownBadge && (
                 <span className="absolute -bottom-1.5 -right-2 text-[9px] font-mono leading-none text-zinc-500 bg-[#101010] px-[1px] tabular-nums">
                   {secsLeft}
