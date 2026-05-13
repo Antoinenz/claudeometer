@@ -409,9 +409,21 @@ pub fn tray_action(app: AppHandle, action: String) -> Result<(), String> {
             Ok(())
         }
         "settings" => {
-            bring_main_to_front(&app);
-            app.emit("tray-navigate", serde_json::json!({ "view": "settings" }))
-                .map_err(|e| e.to_string())
+            if app.get_webview_window("main").is_some() {
+                // Window is hidden but React is already mounted. Emit the navigation
+                // event first so React commits the Settings view while still hidden,
+                // then pause long enough for the WebView2 compositor to produce one
+                // frame with the new content before we make the window visible.
+                let _ = app.emit("tray-navigate", serde_json::json!({ "view": "settings" }));
+                std::thread::sleep(std::time::Duration::from_millis(50));
+                bring_main_to_front(&app);
+            } else {
+                // Window was destroyed — React isn't mounted yet, so emit after
+                // the window is created and shown.
+                bring_main_to_front(&app);
+                let _ = app.emit("tray-navigate", serde_json::json!({ "view": "settings" }));
+            }
+            Ok(())
         }
         "quit" => {
             app.exit(0);
