@@ -6,12 +6,13 @@ A lightweight desktop app for monitoring your [Claude.ai](https://claude.ai) usa
 
 ## Features
 
-- Live usage bars for your 5-hour and 7-day Claude limits
+- Live usage bars for your 5-hour, 7-day, and 7-day Sonnet limits
 - Automatic background polling with a configurable interval
 - Refresh on window focus
 - Desktop notifications with customisable rules (threshold, spike, reset soon, recovery)
 - [ntfy](https://ntfy.sh) push notification support
-- Supports Claude.ai session key authentication
+- Session key stored securely in the OS keychain — never written to disk in plain text
+- Minimal footprint — built with Tauri, not Electron
 
 ## Getting started
 
@@ -44,7 +45,7 @@ Claudeometer uses your Claude.ai **session key** to read usage data.
 2. Open DevTools → Application → Cookies
 3. Copy the value of `sessionKey`
 
-Your key is stored locally and never leaves your machine.
+Your session key is stored in the **OS keychain** — Windows Credential Manager on Windows, Keychain on macOS — and is never written to a plain-text file. Only non-sensitive data (display preferences, notification rules) is stored in the app's settings file.
 
 ## Notifications
 
@@ -56,6 +57,8 @@ Rules are edge-triggered — each rule fires once per crossing rather than on ev
 | Spike | Usage jumps by more than a set amount between polls |
 | Reset soon | A window is within a set time of resetting |
 | Recovery | Usage falls back below a set percentage |
+
+Both desktop notifications and [ntfy](https://ntfy.sh) push notifications are supported, each with their own independent rule sets.
 
 ## License
 
