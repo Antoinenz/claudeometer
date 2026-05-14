@@ -189,6 +189,26 @@ pub async fn save_session_key(app: AppHandle, key: String) -> Result<AuthState, 
     }
     store.save().map_err(|e| e.to_string())?;
 
+    // Restore tray and autostart now that the user is signed in.
+    let settings: Settings = store
+        .get("settings")
+        .and_then(|v| serde_json::from_value(v).ok())
+        .unwrap_or_default();
+
+    if let Some(tray_state) = app.try_state::<crate::TrayState>() {
+        if let Some(ref tray) = *tray_state.0.lock().unwrap() {
+            let _ = tray.set_visible(settings.show_in_tray);
+        }
+    }
+
+    #[cfg(desktop)]
+    {
+        use tauri_plugin_autostart::ManagerExt;
+        if settings.launch_at_startup {
+            let _ = app.autolaunch().enable();
+        }
+    }
+
     Ok(AuthState {
         mode: "session_key".to_string(),
         email,
@@ -211,7 +231,24 @@ pub async fn logout(app: AppHandle) -> Result<(), String> {
     store.delete("settings");
     store.save().map_err(|e| e.to_string())?;
 
-    // Stop API server — it will restart with defaults if re-enabled
+    // Disable autostart
+    #[cfg(desktop)]
+    {
+        use tauri_plugin_autostart::ManagerExt;
+        let _ = app.autolaunch().disable();
+    }
+
+    // Hide tray icon and close tray menu window
+    if let Some(tray_state) = app.try_state::<crate::TrayState>() {
+        if let Some(ref tray) = *tray_state.0.lock().unwrap() {
+            let _ = tray.set_visible(false);
+        }
+    }
+    if let Some(w) = app.get_webview_window("tray-menu") {
+        let _ = w.hide();
+    }
+
+    // Stop API server
     crate::api::apply(&app, &Settings::default());
 
     Ok(())

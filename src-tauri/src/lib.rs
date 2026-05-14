@@ -67,10 +67,23 @@ pub fn run() {
             start_polling(app.handle().clone(), poll_state);
             setup_close_behavior(app)?;
 
+            let store = app.store("store.json").ok();
+            let is_signed_in = store.as_ref()
+                .and_then(|s| s.get("auth_mode"))
+                .and_then(|v| v.as_str().map(str::to_string))
+                .map(|m| m == "session_key")
+                .unwrap_or(false);
+
+            // Enforce: no autostart until user is signed in.
+            #[cfg(desktop)]
+            if !is_signed_in {
+                use tauri_plugin_autostart::ManagerExt;
+                let _ = app.autolaunch().disable();
+            }
+
             // Start API server if it was enabled in persisted settings.
-            let settings: commands::Settings = app
-                .store("store.json")
-                .ok()
+            let settings: commands::Settings = store
+                .as_ref()
                 .and_then(|s| s.get("settings"))
                 .and_then(|v| serde_json::from_value(v).ok())
                 .unwrap_or_default();
@@ -118,15 +131,19 @@ fn setup_tray(app: &mut tauri::App) -> tauri::Result<()> {
         })
         .build(app)?;
 
-    // Apply initial visibility from persisted settings.
-    let show = app
-        .store("store.json")
-        .ok()
+    // Only show tray if the user is signed in AND show_in_tray is enabled.
+    let store = app.store("store.json").ok();
+    let is_signed_in = store.as_ref()
+        .and_then(|s| s.get("auth_mode"))
+        .and_then(|v| v.as_str().map(str::to_string))
+        .map(|m| m == "session_key")
+        .unwrap_or(false);
+    let show_in_tray = store.as_ref()
         .and_then(|s| s.get("settings"))
         .and_then(|v| v.get("show_in_tray").cloned())
         .and_then(|v| v.as_bool())
         .unwrap_or(true);
-    if !show {
+    if !is_signed_in || !show_in_tray {
         let _ = tray.set_visible(false);
     }
 
