@@ -479,14 +479,11 @@ function ApiKeyField({
   value: string;
   onRegenerate: (key: string) => void;
 }) {
-  const [visible, setVisible] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const display = visible
-    ? value
-    : value.length > 12
-      ? `${value.slice(0, 8)}${"●".repeat(8)}${value.slice(-8)}`
-      : "●".repeat(value.length || 8);
+  const display = value.length > 12
+    ? `${value.slice(0, 8)}${"●".repeat(8)}${value.slice(-8)}`
+    : "●".repeat(value.length || 8);
 
   const copy = () => {
     if (!value) return;
@@ -499,58 +496,61 @@ function ApiKeyField({
     <div className="space-y-1.5">
       <p className="text-[11px] text-zinc-500 font-medium">API key</p>
       <div className="flex gap-1.5">
-        <div className="flex-1 min-w-0 bg-zinc-950/60 border border-zinc-800 rounded-md px-2.5 py-1.5 font-mono text-[11.5px] text-zinc-300 truncate select-all">
-          {value ? display : <span className="text-zinc-600 font-sans not-italic">No key — click Regen</span>}
+        <div className="flex-1 min-w-0 bg-zinc-950/60 border border-zinc-800 rounded-md px-2.5 py-1.5 font-mono text-[11.5px] text-zinc-300 truncate">
+          {value ? display : <span className="text-zinc-600 font-sans">No key — click Regen</span>}
         </div>
-        <button
-          onClick={() => setVisible((v) => !v)}
-          className="shrink-0 px-2 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-zinc-300 transition-colors text-[11px]"
-        >{visible ? "Hide" : "Show"}</button>
         <button
           onClick={copy}
           disabled={!value}
-          className="shrink-0 px-2 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-zinc-300 transition-colors text-[11px] disabled:opacity-40 disabled:pointer-events-none"
+          className="shrink-0 px-2.5 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-zinc-300 transition-colors text-[11px] disabled:opacity-40 disabled:pointer-events-none"
         >{copied ? "✓" : "Copy"}</button>
         <button
           onClick={() => onRegenerate(generateApiKey())}
-          className="shrink-0 px-2 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-zinc-300 transition-colors text-[11px]"
+          className="shrink-0 px-2.5 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-zinc-300 transition-colors text-[11px]"
         >Regen</button>
       </div>
     </div>
   );
 }
 
-function ApiPreview({ port, localOnly, requireAuth, apiKey, allowReadUsage }: {
+function ApiPreview({ port, requireAuth, apiKey, allowReadUsage }: {
   port: number;
-  localOnly: boolean;
   requireAuth: boolean;
   apiKey: string;
   allowReadUsage: boolean;
 }) {
-  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
-  const [testing, setTesting] = useState(false);
-
   const baseUrl = `http://127.0.0.1:${port}`;
   const endpoint = allowReadUsage ? "/usage" : "/";
-  const maskedKey = apiKey.length > 12 ? `${apiKey.slice(0, 8)}…` : apiKey;
-  const authLine = requireAuth && apiKey ? `  -H "Authorization: Bearer ${maskedKey}"` : null;
-  const curlCmd = [`curl ${baseUrl}${endpoint}`, ...(authLine ? [authLine] : [])].join(" \\\n");
+  const authLine = requireAuth && apiKey
+    ? `  -H "Authorization: Bearer ${apiKey.slice(0, 8)}…"`
+    : null;
+  const generatedCurl = [`curl ${baseUrl}${endpoint}`, ...(authLine ? [authLine] : [])].join(" \\\n");
+
+  const [curlText, setCurlText] = useState(generatedCurl);
+  const [testing, setTesting] = useState(false);
+  const [response, setResponse] = useState<{ ok: boolean; status: number; body: string } | null>(null);
+
+  // Keep textarea in sync when settings change
+  useEffect(() => { setCurlText(generatedCurl); }, [generatedCurl]);
+
+  const extractUrl = (text: string) => text.match(/https?:\/\/[^\s\\]+/)?.[0] ?? null;
 
   const test = async () => {
+    const url = extractUrl(curlText);
+    if (!url) return;
     setTesting(true);
-    setTestResult(null);
+    setResponse(null);
     try {
       const headers: Record<string, string> = {};
       if (requireAuth && apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
-      const resp = await fetch(`${baseUrl}/`, { headers });
-      const data = await resp.json().catch(() => ({}));
-      if (resp.ok) {
-        setTestResult({ ok: true, msg: `Connected · Claudeometer v${data.version ?? "?"}` });
-      } else {
-        setTestResult({ ok: false, msg: `${resp.status} ${data.error ?? resp.statusText}` });
-      }
-    } catch {
-      setTestResult({ ok: false, msg: "Connection refused — server may not have started yet" });
+      const resp = await fetch(url, { headers });
+      const text = await resp.text();
+      let body: string;
+      try { body = JSON.stringify(JSON.parse(text), null, 2); }
+      catch { body = text; }
+      setResponse({ ok: resp.ok, status: resp.status, body });
+    } catch (e) {
+      setResponse({ ok: false, status: 0, body: String(e) });
     } finally {
       setTesting(false);
     }
@@ -559,35 +559,43 @@ function ApiPreview({ port, localOnly, requireAuth, apiKey, allowReadUsage }: {
   return (
     <div className="space-y-2">
       <p className="text-[10.5px] font-semibold text-zinc-600 uppercase tracking-[0.08em] px-0.5">Preview</p>
-      <div className="rounded-lg bg-zinc-950 border border-zinc-800/80 px-3 py-2.5 space-y-2">
+      <div className="rounded-lg bg-zinc-950 border border-zinc-800/80 px-3 py-2.5 space-y-2.5">
         <div>
           <p className="text-[9.5px] text-zinc-600 font-medium uppercase tracking-wider mb-0.5">Base URL</p>
-          <p className="text-[12px] text-amber-400/80 font-mono">
-            {baseUrl}
-            {!localOnly && (
-              <span className="text-zinc-600 ml-1 font-sans text-[10.5px] not-italic">· also reachable by network</span>
-            )}
-          </p>
+          <p className="text-[12px] text-amber-400/80 font-mono select-all cursor-text">{baseUrl}</p>
         </div>
         <div>
-          <p className="text-[9.5px] text-zinc-600 font-medium uppercase tracking-wider mb-0.5">Example</p>
-          <pre className="text-[11px] text-zinc-400 font-mono leading-relaxed whitespace-pre-wrap">{curlCmd}</pre>
+          <p className="text-[9.5px] text-zinc-600 font-medium uppercase tracking-wider mb-1">Request</p>
+          <textarea
+            value={curlText}
+            onChange={(e) => setCurlText(e.target.value)}
+            spellCheck={false}
+            rows={curlText.split("\n").length}
+            className="w-full resize-none bg-transparent text-[11px] text-zinc-400 font-mono leading-relaxed focus:outline-none"
+          />
         </div>
       </div>
       <div className="flex items-center gap-2.5">
         <button
           onClick={test}
-          disabled={testing}
+          disabled={testing || !extractUrl(curlText)}
           className="text-[11.5px] px-2.5 py-1 rounded-md bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-700 transition-colors disabled:opacity-40 disabled:pointer-events-none"
         >
-          {testing ? "Testing…" : "Test connection"}
+          {testing ? "Testing…" : "Send"}
         </button>
-        {testResult && (
-          <p className={`text-[11px] ${testResult.ok ? "text-emerald-400" : "text-red-400"}`}>
-            {testResult.ok ? "✓ " : "✗ "}{testResult.msg}
-          </p>
+        {response && (
+          <span className={`text-[11px] font-mono tabular-nums ${response.ok ? "text-emerald-400" : "text-red-400"}`}>
+            {response.status > 0 ? `HTTP ${response.status}` : "Error"}
+          </span>
         )}
       </div>
+      {response && (
+        <div className="rounded-lg bg-zinc-950 border border-zinc-800/80 px-3 py-2.5 max-h-[160px] overflow-y-auto no-scrollbar">
+          <pre className={`text-[10.5px] font-mono leading-relaxed whitespace-pre-wrap ${response.ok ? "text-zinc-300" : "text-red-400/90"}`}>
+            {response.body}
+          </pre>
+        </div>
+      )}
     </div>
   );
 }
@@ -791,6 +799,8 @@ export default function Settings({ auth, isFocused, onBack, onLogout, onOpenDebu
           />
           {settings.api_enabled && (
             <>
+              <div className="h-px bg-zinc-800/60" />
+
               <div className="space-y-1.5">
                 <label className="text-[11px] text-zinc-500 font-medium">Port</label>
                 <input
@@ -821,12 +831,14 @@ export default function Settings({ auth, isFocused, onBack, onLogout, onOpenDebu
                     >{label}</button>
                   ))}
                 </div>
-                {!settings.api_local_only && (
+                {!settings.api_local_only && !settings.api_require_auth && (
                   <p className="text-[11px] text-amber-600/90 leading-relaxed">
                     Anyone on your network can reach this API — use credentials.
                   </p>
                 )}
               </div>
+
+              <div className="h-px bg-zinc-800/60" />
 
               <Toggle
                 label="Require credentials"
@@ -846,6 +858,8 @@ export default function Settings({ auth, isFocused, onBack, onLogout, onOpenDebu
                   onRegenerate={(key) => update({ api_key: key })}
                 />
               )}
+
+              <div className="h-px bg-zinc-800/60" />
 
               <div className="space-y-2.5">
                 <p className="text-[10px] text-zinc-600 font-medium uppercase tracking-wider px-0.5">Permissions</p>
@@ -875,9 +889,10 @@ export default function Settings({ auth, isFocused, onBack, onLogout, onOpenDebu
                 />
               </div>
 
+              <div className="h-px bg-zinc-800/60" />
+
               <ApiPreview
                 port={settings.api_port}
-                localOnly={settings.api_local_only}
                 requireAuth={settings.api_require_auth}
                 apiKey={settings.api_key}
                 allowReadUsage={settings.api_allow_read_usage}
